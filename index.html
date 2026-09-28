@@ -397,6 +397,13 @@ button.mini:disabled{opacity:.5;cursor:default;}
     <button class="close-x" id="closeSettings">✕</button>
     <h2 class="serif">設定</h2>
     <div class="field">
+      <label>Hugging Face API Token</label>
+      <div class="token-row">
+        <input type="password" id="tokenInput" placeholder="hf_..." autocomplete="off">
+        <button class="mini" id="toggleTokenVisibility" style="width:auto;padding:8px 10px;">顯示</button>
+      </div>
+    </div>
+    <div class="field">
       <label>回答模型</label>
       <select id="modelSelect">
         <option value="deepseek-ai/DeepSeek-V3">DeepSeek-V3（預設，中文文言理解佳）</option>
@@ -404,19 +411,12 @@ button.mini:disabled{opacity:.5;cursor:default;}
         <option value="meta-llama/Llama-3.3-70B-Instruct">Llama-3.3-70B-Instruct</option>
       </select>
     </div>
-    <details class="field" style="margin-top:-4px;">
-      <summary style="cursor:pointer;font-size:.8rem;color:var(--ink-soft);">使用自己的 Hugging Face Token（進階，選填）</summary>
-      <div class="token-row" style="margin-top:8px;">
-        <input type="password" id="tokenInput" placeholder="留空＝使用內建共用 Token" autocomplete="off">
-        <button class="mini" id="toggleTokenVisibility" style="width:auto;padding:8px 10px;">顯示</button>
-      </div>
-    </details>
     <div class="modal-actions">
       <button id="cancelSettings">取消</button>
       <button class="primary" id="saveSettings">儲存</button>
     </div>
     <p class="small-note">
-      本工具已內建一組共用 Hugging Face Token，開啟即可直接使用，無需自行申請。每次提問會呼叫 Hugging Face Inference Providers（BAAI/bge-m3 向量化 + 對話模型），依此 Token 帳號的用量計費，單次問答成本通常低於 US$0.0005。若想改用自己的 Token（例如共用額度用盡），可在上方「進階」欄位輸入，將只存於您瀏覽器的 localStorage。
+      Token 僅儲存在您瀏覽器的 localStorage，不會傳送到 Hugging Face 以外的任何地方；每次提問會呼叫 Hugging Face Inference Providers（BAAI/bge-m3 向量化 + 對話模型），依您帳號的用量計費，單次問答成本通常低於 US$0.0005。若尚未取得 Token，可至 huggingface.co → Settings → Access Tokens 建立一組具 Inference 權限的 Token。
     </p>
   </div>
 </div>
@@ -434,8 +434,6 @@ button.mini:disabled{opacity:.5;cursor:default;}
   const BATCH_SIZE = 12;
   const TOP_K = 6;
   const STORE_KEY = 'liutie_v1';
-  // 內建共用 Token：僅供本專案（白氏六帖事類集數位化）團隊使用，權限已限制在 Inference 用途。
-  const DEFAULT_TOKEN = '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';
 
   const el = (id) => document.getElementById(id);
   const chatLog = el('chatLog');
@@ -467,15 +465,11 @@ button.mini:disabled{opacity:.5;cursor:default;}
   }
 
   // ---------- settings ----------
-  // token 為使用者自訂的覆蓋值（選填）；實際呼叫 API 一律用 activeToken()，
-  // 沒有自訂值時 fall back 到內建的 DEFAULT_TOKEN。
   let settings = { token:'', model:'deepseek-ai/DeepSeek-V3' };
   try {
     const raw = safeStorageGet('liutie_settings');
     if (raw) settings = Object.assign(settings, JSON.parse(raw));
   } catch(e){}
-
-  function activeToken(){ return (settings.token && settings.token.trim()) || DEFAULT_TOKEN; }
 
   const settingsOverlay = el('settingsOverlay');
   const tokenInput = el('tokenInput');
@@ -502,6 +496,10 @@ button.mini:disabled{opacity:.5;cursor:default;}
     safeStorageSet('liutie_settings', JSON.stringify(settings));
     closeSettings();
   });
+
+  if (!settings.token) {
+    setTimeout(openSettings, 300);
+  }
 
   // ---------- index (embeddings) ----------
   let index = null; // { sig, vectors: number[][] }
@@ -536,13 +534,14 @@ button.mini:disabled{opacity:.5;cursor:default;}
   }
 
   async function buildIndex(){
+    if (!settings.token) { openSettings(); return; }
     buildBtn.disabled = true;
     progressWrap.hidden = false;
     const vectors = new Array(DOCS.length);
     try {
       for (let i = 0; i < DOCS.length; i += BATCH_SIZE) {
         const batch = DOCS.slice(i, i + BATCH_SIZE).map(d => d.text.slice(0, 3000));
-        const embs = await embedBatch(batch, activeToken());
+        const embs = await embedBatch(batch, settings.token);
         for (let j = 0; j < embs.length; j++) vectors[i+j] = embs[j];
         const done = Math.min(i + BATCH_SIZE, DOCS.length);
         progressBar.style.width = Math.round(done/DOCS.length*100) + '%';
@@ -671,6 +670,7 @@ button.mini:disabled{opacity:.5;cursor:default;}
   }
 
   async function askQuestion(question){
+    if (!settings.token) { openSettings(); return; }
     addUserMessage(question);
     const { wrap, bubble } = addAssistantPending();
     try {
@@ -684,7 +684,7 @@ button.mini:disabled{opacity:.5;cursor:default;}
         }
       }
       bubble.textContent = '正在向量化提問…';
-      const qEmbArr = await embedBatch([question], activeToken());
+      const qEmbArr = await embedBatch([question], settings.token);
       const qVec = qEmbArr[0];
       const hits = retrieve(qVec, TOP_K);
       bubble.textContent = '正在請模型生成回答…';
@@ -692,7 +692,7 @@ button.mini:disabled{opacity:.5;cursor:default;}
         { role:'system', content: buildSystemPrompt() },
         { role:'user', content: buildUserMessage(question, hits) }
       ];
-      const answer = await chatCompletion(messages, settings.model || 'deepseek-ai/DeepSeek-V3', activeToken());
+      const answer = await chatCompletion(messages, settings.model || 'deepseek-ai/DeepSeek-V3', settings.token);
       renderAssistantAnswer(bubble, wrap, answer, hits);
     } catch (err) {
       bubble.className = 'bubble error';
