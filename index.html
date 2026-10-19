@@ -710,7 +710,7 @@ mark{
     let s = '';
     if (d.menu) s += d.menu;
     if (d.sub_menu) s += '／' + d.sub_menu;
-    if (d.page) s += '（印刷頁' + d.page + (d.leaf ? '／葉' + d.leaf : '') + '）';
+    if (d.page) s += '（印刷頁' + String(d.page).replace(/^印刷頁/, '') + (d.leaf ? '／葉' + d.leaf : '') + '）';
     return s || d.source;
   }
 
