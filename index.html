@@ -1,6 +1,8 @@
 <title>六帖問對</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#f5efe1;
@@ -344,13 +346,58 @@ button.mini:disabled{opacity:.5;cursor:default;}
 .modal-actions button.primary{background:var(--accent);color:#fff;border:none;}
 .close-x{position:absolute;top:12px;right:16px;background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--ink-soft);}
 .modal{position:relative;}
+.dot.mid{background:var(--thread-soft);}
+.mode-banner{
+  border:1px dashed var(--line);
+  border-radius:8px;
+  padding:8px 12px;
+  font-size:.78rem;
+  color:var(--ink-soft);
+  background:var(--chip-bg);
+  line-height:1.65;
+}
+.mode-banner b{color:var(--ink);}
+mark{
+  background:color-mix(in srgb,var(--accent) 30%,transparent);
+  color:inherit;
+  border-radius:2px;
+  padding:0 1px;
+}
+.check-row{
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+  font-size:.8rem;
+  color:var(--ink-soft);
+  margin:0 0 10px;
+  line-height:1.5;
+  cursor:pointer;
+}
+.check-row input{margin-top:3px;flex-shrink:0;}
+.passages{margin-top:8px;}
+.passage{
+  border:1px solid var(--line);
+  border-radius:8px;
+  margin-top:8px;
+  background:var(--paper);
+}
+.passage > summary{
+  cursor:pointer;
+  padding:8px 10px;
+  font-size:.8rem;
+  color:var(--thread);
+  line-height:1.5;
+}
+.passage .source-text{padding:0 10px 10px;margin-top:0;}
+.settings-msg{font-size:.78rem;color:var(--bad);min-height:1em;margin:-4px 0 8px;}
+.clear-key{margin-top:10px;}
 </style>
 
 <div class="app">
   <header class="top">
     <div class="title-block">
       <h1 class="serif">六帖問對</h1>
-      <p>《白氏六帖事類集》前言＋卷一 · 檢索增強問答</p>
+      <p>《白氏六帖事類集》前言＋卷一 · 本機檢索問答</p>
     </div>
     <button class="gear-btn" id="openSettings">⚙ 設定</button>
   </header>
@@ -361,12 +408,9 @@ button.mini:disabled{opacity:.5;cursor:default;}
         <h2>語料庫</h2>
         <div class="status-row"><span>已收錄段落</span><span class="v mono" id="docCount">—</span></div>
         <div class="status-row"><span>涵蓋範圍</span><span class="v">前言＋卷一</span></div>
-        <div class="status-row"><span>索引狀態</span><span class="v" id="indexStatus"><span class="dot no"></span>尚未建立</span></div>
-        <button class="mini" id="buildIndexBtn" style="margin-top:8px;">建立／重建向量索引</button>
-        <div class="progress-wrap" id="progressWrap" hidden>
-          <div class="progress-bar" id="progressBar"></div>
-        </div>
-        <div class="progress-label" id="progressLabel"></div>
+        <div class="status-row"><span>檢索方式</span><span class="v"><span class="dot ok"></span>本機字詞檢索</span></div>
+        <div class="status-row"><span>回答方式</span><span class="v" id="modeStatus"></span></div>
+        <p class="small-note" style="margin-top:8px;">檢索在您的瀏覽器內完成，免費、不需任何 token，也不必事先建立索引。</p>
       </div>
       <div>
         <h2>卷一總目（點選插入提問）</h2>
@@ -376,10 +420,11 @@ button.mini:disabled{opacity:.5;cursor:default;}
 
     <section class="chat-col">
       <div class="panel" style="flex:1;display:flex;flex-direction:column;gap:12px;min-height:360px;">
+        <div class="mode-banner" id="modeBanner"></div>
         <div class="chat-log" id="chatLog">
           <div class="empty-state" id="emptyState">
             <h3 class="serif">與《白氏六帖事類集》對話</h3>
-            <p>已收錄前言、卷一總目、卷一正文（約 66 個門類段落）與卷一校勘表（30 條），可就這些內容提問；卷二至卷三十尚未收錄。</p>
+            <p>已收錄前言、卷一總目、卷一正文（約 66 個門類段落）與卷一校勘表（30 條），可就這些內容提問；卷二至卷三十尚未收錄。檢索以「字詞比對」為主，提問時盡量帶入原文用字、典故原句或門類名稱，命中會更準。</p>
             <div class="examples" id="exampleChips"></div>
           </div>
         </div>
@@ -396,27 +441,36 @@ button.mini:disabled{opacity:.5;cursor:default;}
   <div class="modal">
     <button class="close-x" id="closeSettings">✕</button>
     <h2 class="serif">設定</h2>
+    <p class="small-note" style="margin-top:-4px;margin-bottom:14px;">
+      不填 Claude API Key 也能使用：此時只會列出檢索到的原文段落。填入後，Claude 會根據這些段落整理成回答。
+    </p>
     <div class="field">
-      <label>Hugging Face API Token</label>
+      <label>Claude API Key（選填）</label>
       <div class="token-row">
-        <input type="password" id="tokenInput" placeholder="hf_..." autocomplete="off">
-        <button class="mini" id="toggleTokenVisibility" style="width:auto;padding:8px 10px;">顯示</button>
+        <input type="password" id="keyInput" placeholder="sk-ant-…" autocomplete="off">
+        <button class="mini" id="toggleKeyVisibility" style="width:auto;padding:8px 10px;">顯示</button>
       </div>
     </div>
     <div class="field">
-      <label>回答模型</label>
-      <select id="modelSelect">
-        <option value="deepseek-ai/DeepSeek-V3">DeepSeek-V3（預設，中文文言理解佳）</option>
-        <option value="Qwen/Qwen2.5-72B-Instruct">Qwen2.5-72B-Instruct</option>
-        <option value="meta-llama/Llama-3.3-70B-Instruct">Llama-3.3-70B-Instruct</option>
-      </select>
+      <label>Claude 模型（可直接輸入模型 ID）</label>
+      <input type="text" id="modelInput" list="modelList" autocomplete="off">
+      <datalist id="modelList">
+        <option value="claude-sonnet-4-6"></option>
+        <option value="claude-sonnet-5"></option>
+        <option value="claude-opus-5-5"></option>
+        <option value="claude-haiku-4-5-20251001"></option>
+      </datalist>
     </div>
+    <label class="check-row"><input type="checkbox" id="rememberKey"><span>在此瀏覽器記住金鑰（取消勾選則只保留到關閉或重新整理頁面）</span></label>
+    <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列出檢索到的原文，不呼叫 Claude（即使已填金鑰）</span></label>
+    <div class="settings-msg" id="settingsMsg"></div>
     <div class="modal-actions">
       <button id="cancelSettings">取消</button>
       <button class="primary" id="saveSettings">儲存</button>
     </div>
+    <button class="mini clear-key" id="clearKeyBtn">清除此瀏覽器已儲存的金鑰</button>
     <p class="small-note">
-      Token 僅儲存在您瀏覽器的 localStorage，不會傳送到 Hugging Face 以外的任何地方；每次提問會呼叫 Hugging Face Inference Providers（BAAI/bge-m3 向量化 + 對話模型），依您帳號的用量計費，單次問答成本通常低於 US$0.0005。若尚未取得 Token，可至 huggingface.co → Settings → Access Tokens 建立一組具 Inference 權限的 Token。
+      檢索完全在本機進行。只有在使用 Claude 整理回答時，您的提問與檢索到的原文段落才會送到 api.anthropic.com，依您的 Claude API 用量計費；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
     </p>
   </div>
 </div>
@@ -429,199 +483,344 @@ button.mini:disabled{opacity:.5;cursor:default;}
 (function(){
   "use strict";
   const DOCS = JSON.parse(document.getElementById('corpus-data').textContent);
-  const EMBED_URL = 'https://router.huggingface.co/hf-inference/models/BAAI/bge-m3/pipeline/feature-extraction';
-  const CHAT_URL = 'https://router.huggingface.co/v1/chat/completions';
-  const BATCH_SIZE = 12;
   const TOP_K = 6;
-  const STORE_KEY = 'liutie_v1';
+  const API_URL = 'https://api.anthropic.com/v1/messages';
+  const DEFAULT_MODEL = 'claude-sonnet-4-6';
+  const SETTINGS_KEY = 'liutie_settings_v2';
 
+  /*RETRIEVAL_START*/
+  // ---------- 本機檢索：二字詞 BM25 + 門類名稱加權 ----------
+  const PUNCT_RE = /[\s　「」『』（）()《》〈〉【】\[\]{}、，。；：？！,.;:?!"'“”‘’·…—－\-／\/\\|〔〕]+/g;
+  const QUERY_STOP = ['請引用原文','引用原文','出自何處','出自哪裡','出自哪裏','請問','告訴我','有哪些','有沒有','為什麼',
+    '哪些','哪個','什麼','為何','如何','是否','收錄','門下','提到','共有','卷第一','卷一','一下','說明','幫我','請','嗎','呢','吧']
+    .sort((a,b)=> b.length - a.length);
+
+  function runsOf(str){
+    return String(str == null ? '' : str).split(PUNCT_RE).filter(Boolean);
+  }
+  function bigramsOf(str){
+    const out = [];
+    for (const run of runsOf(str)) {
+      const chars = Array.from(run);
+      for (let i = 0; i < chars.length - 1; i++) out.push(chars[i] + chars[i+1]);
+    }
+    return out;
+  }
+  function cleanQuery(q){
+    let s = String(q || '');
+    for (const w of QUERY_STOP) s = s.split(w).join(' ');
+    return s;
+  }
+
+  function buildSearchIndex(docs){
+    const df = new Map();
+    const items = docs.map(d => {
+      const tf = new Map();
+      let len = 0;
+      const add = (tokens, w) => { for (const t of tokens) { tf.set(t, (tf.get(t) || 0) + w); len += w; } };
+      add(bigramsOf(d.text), 1);
+      add(bigramsOf(d.menu), 3);
+      add(bigramsOf(d.sub_menu), 3);
+      add(bigramsOf(d.source), 1);
+      return { tf, len };
+    });
+    for (const it of items) for (const t of it.tf.keys()) df.set(t, (df.get(t) || 0) + 1);
+    const avgLen = items.reduce((s, i) => s + i.len, 0) / Math.max(1, items.length);
+
+    // 門類名稱（例如「風第十三」）：問題中完整出現時加權
+    const keyCount = new Map();
+    const docKeys = docs.map(d => {
+      const ks = new Set(runsOf(d.menu).concat(runsOf(d.sub_menu)).filter(r => r.length >= 3 && !/^(卷|目錄)/.test(r)));
+      ks.forEach(k => keyCount.set(k, (keyCount.get(k) || 0) + 1));
+      return ks;
+    });
+    return { items, df, avgLen, N: docs.length, docKeys, keyCount };
+  }
+
+  function makeRetriever(docs){
+    const idx = buildSearchIndex(docs);
+    const k1 = 1.2, b = 0.75;
+    const idOf = (id) => docs.findIndex(d => d.id === id);
+
+    return function retrieve(question, k){
+      let qTokens = Array.from(new Set(bigramsOf(cleanQuery(question))));
+      if (!qTokens.length) qTokens = Array.from(new Set(bigramsOf(question)));
+      const qSet = new Set(qTokens);
+      const qNorm = String(question || '').replace(PUNCT_RE, '');
+
+      const scores = new Array(docs.length).fill(0);
+      for (const t of qTokens) {
+        const df = idx.df.get(t) || 0;
+        if (!df) continue;
+        const idf = Math.log(1 + (idx.N - df + 0.5) / (df + 0.5));
+        for (let i = 0; i < idx.items.length; i++) {
+          const tf = idx.items[i].tf.get(t);
+          if (!tf) continue;
+          const norm = tf + k1 * (1 - b + b * idx.items[i].len / idx.avgLen);
+          scores[i] += idf * (tf * (k1 + 1)) / norm;
+        }
+      }
+      const maxRaw = Math.max(0, ...scores);
+      for (let i = 0; i < docs.length; i++) {
+        for (const key of idx.docKeys[i]) {
+          if ((idx.keyCount.get(key) || 0) <= 8 && qNorm.includes(key)) {
+            scores[i] += Math.max(3, 0.5 * maxRaw);
+            break;
+          }
+        }
+      }
+
+      // 非校勘問題時，校勘表條目略降權，讓正文優先
+      if (!/校勘|校記|參校|改定|底本|初錄|釋讀|異文|校本/.test(question)) {
+        for (let i = 0; i < docs.length; i++) if (docs[i].source === '校勘表') scores[i] *= 0.75;
+      }
+
+      let ranked = scores.map((s, i) => ({ i, s })).filter(x => x.s > 0).sort((a, c) => c.s - a.s);
+
+      // 問「總目／門類」之類的問題，固定帶入目錄（問全書時，全書目錄排最前）
+      const forced = [];
+      if (/全書|三十卷|各卷|卷二|卷三/.test(question)) forced.push('toc-30juan');
+      if (/總目|目錄|門類|門目|有哪些門|全書/.test(question)) forced.push('toc-juan1');
+      const top = ranked.length ? ranked[0].s : 1;
+      let chosen = ranked.slice(0, k);
+      for (const fid of forced.slice().reverse()) {
+        const di = idOf(fid);
+        if (di < 0) continue;
+        const existing = chosen.find(x => x.i === di);
+        chosen = chosen.filter(x => x.i !== di);
+        chosen.unshift(existing || { i: di, s: top });
+      }
+      chosen = chosen.slice(0, k);
+
+      const best = chosen.length ? Math.max(...chosen.map(x => x.s)) : 1;
+      const hits = chosen.map(x => ({ doc: docs[x.i], score: x.s, rel: Math.max(1, Math.round(100 * x.s / best)) }));
+      return { hits, qSet };
+    };
+  }
+  /*RETRIEVAL_END*/
+
+  const retrieve = makeRetriever(DOCS);
+
+  // ---------- DOM refs ----------
   const el = (id) => document.getElementById(id);
   const chatLog = el('chatLog');
   const emptyState = el('emptyState');
-  const docCountEl = el('docCount');
-  const indexStatusEl = el('indexStatus');
-  const buildBtn = el('buildIndexBtn');
-  const progressWrap = el('progressWrap');
-  const progressBar = el('progressBar');
-  const progressLabel = el('progressLabel');
   const questionInput = el('questionInput');
   const sendBtn = el('sendBtn');
   const tocList = el('tocList');
   const exampleChips = el('exampleChips');
+  const modeStatus = el('modeStatus');
+  const modeBanner = el('modeBanner');
+  el('docCount').textContent = DOCS.length + ' 段';
 
-  docCountEl.textContent = DOCS.length + ' 段';
+  function safeStorageGet(key){ try { return localStorage.getItem(key); } catch(e){ return null; } }
+  function safeStorageSet(key, val){ try { localStorage.setItem(key, val); return true; } catch(e){ return false; } }
+  function safeStorageRemove(key){ try { localStorage.removeItem(key); } catch(e){} }
 
-  function corpusSignature(){
-    let total = 0;
-    for (const d of DOCS) total += d.text.length;
-    return DOCS.length + ':' + total;
-  }
-
-  function safeStorageGet(key){
-    try { return localStorage.getItem(key); } catch(e){ return null; }
-  }
-  function safeStorageSet(key, val){
-    try { localStorage.setItem(key, val); return true; } catch(e){ return false; }
-  }
+  // 清掉舊版（Hugging Face 向量索引版本）留在此瀏覽器的資料
+  safeStorageRemove('liutie_v1');
+  safeStorageRemove('liutie_settings');
 
   // ---------- settings ----------
-  let settings = { token:'', model:'deepseek-ai/DeepSeek-V3' };
+  let settings = { apiKey: '', model: DEFAULT_MODEL, remember: true, retrievalOnly: false };
   try {
-    const raw = safeStorageGet('liutie_settings');
-    if (raw) settings = Object.assign(settings, JSON.parse(raw));
+    const raw = safeStorageGet(SETTINGS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      settings = Object.assign(settings, {
+        apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
+        model: p.model || DEFAULT_MODEL,
+        remember: p.remember !== false,
+        retrievalOnly: !!p.retrievalOnly
+      });
+    }
   } catch(e){}
 
+  function persistSettings(){
+    safeStorageSet(SETTINGS_KEY, JSON.stringify({
+      model: settings.model,
+      remember: settings.remember,
+      retrievalOnly: settings.retrievalOnly,
+      apiKey: settings.remember ? settings.apiKey : ''
+    }));
+  }
+  function useGeneration(){ return !!settings.apiKey && !settings.retrievalOnly; }
+
+  function renderMode(){
+    if (useGeneration()) {
+      modeStatus.innerHTML = '<span class="dot ok"></span>Claude 整理回答';
+      modeBanner.innerHTML = '回答由 <b></b> 根據本機檢索到的原文段落整理；檢索在您的瀏覽器內完成，只有提問與檢索到的段落會送往 api.anthropic.com。';
+      modeBanner.querySelector('b').textContent = settings.model;
+    } else {
+      modeStatus.innerHTML = '<span class="dot mid"></span>僅列原文';
+      modeBanner.innerHTML = '目前為<b>「僅列原文」</b>模式：直接顯示檢索到的原文段落，不會連線到任何外部服務。若要由 Claude 整理成回答，請到「⚙ 設定」輸入 Claude API Key。';
+    }
+  }
+
   const settingsOverlay = el('settingsOverlay');
-  const tokenInput = el('tokenInput');
-  const modelSelect = el('modelSelect');
+  const keyInput = el('keyInput');
+  const modelInput = el('modelInput');
+  const rememberKey = el('rememberKey');
+  const retrievalOnly = el('retrievalOnly');
+  const settingsMsg = el('settingsMsg');
 
   function openSettings(){
-    tokenInput.value = settings.token || '';
-    modelSelect.value = settings.model || 'deepseek-ai/DeepSeek-V3';
+    keyInput.value = settings.apiKey || '';
+    modelInput.value = settings.model || DEFAULT_MODEL;
+    rememberKey.checked = settings.remember;
+    retrievalOnly.checked = settings.retrievalOnly;
+    settingsMsg.textContent = '';
     settingsOverlay.hidden = false;
   }
   function closeSettings(){ settingsOverlay.hidden = true; }
   el('openSettings').addEventListener('click', openSettings);
   el('closeSettings').addEventListener('click', closeSettings);
   el('cancelSettings').addEventListener('click', closeSettings);
-  el('settingsOverlay').addEventListener('click', (e)=>{ if(e.target===settingsOverlay) closeSettings(); });
-  el('toggleTokenVisibility').addEventListener('click', ()=>{
-    const showing = tokenInput.type === 'text';
-    tokenInput.type = showing ? 'password' : 'text';
-    el('toggleTokenVisibility').textContent = showing ? '顯示' : '隱藏';
+  settingsOverlay.addEventListener('click', (e)=>{ if (e.target === settingsOverlay) closeSettings(); });
+  el('toggleKeyVisibility').addEventListener('click', ()=>{
+    const showing = keyInput.type === 'text';
+    keyInput.type = showing ? 'password' : 'text';
+    el('toggleKeyVisibility').textContent = showing ? '顯示' : '隱藏';
   });
   el('saveSettings').addEventListener('click', ()=>{
-    settings.token = tokenInput.value.trim();
-    settings.model = modelSelect.value;
-    safeStorageSet('liutie_settings', JSON.stringify(settings));
+    const key = keyInput.value.trim();
+    if (key && /^hf_/i.test(key)) {
+      settingsMsg.textContent = '這是 Hugging Face 的 token，不是 Claude API Key（Claude 金鑰以 sk-ant- 開頭）。';
+      return;
+    }
+    settings.apiKey = key;
+    settings.model = modelInput.value.trim() || DEFAULT_MODEL;
+    settings.remember = rememberKey.checked;
+    settings.retrievalOnly = retrievalOnly.checked;
+    persistSettings();
+    renderMode();
     closeSettings();
   });
+  el('clearKeyBtn').addEventListener('click', ()=>{
+    settings.apiKey = '';
+    keyInput.value = '';
+    persistSettings();
+    renderMode();
+    settingsMsg.textContent = '';
+  });
+  renderMode();
 
-  if (!settings.token) {
-    setTimeout(openSettings, 300);
-  }
-
-  // ---------- index (embeddings) ----------
-  let index = null; // { sig, vectors: number[][] }
-  try {
-    const raw = safeStorageGet(STORE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.sig === corpusSignature()) index = parsed;
-    }
-  } catch(e){}
-
-  function renderIndexStatus(){
-    if (index && index.vectors && index.vectors.length === DOCS.length) {
-      indexStatusEl.innerHTML = '<span class="dot ok"></span>已建立（' + index.vectors.length + ' 段）';
-    } else {
-      indexStatusEl.innerHTML = '<span class="dot no"></span>尚未建立';
-    }
-  }
-  renderIndexStatus();
-
-  async function embedBatch(texts, token){
-    const res = await fetch(EMBED_URL, {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: texts })
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(()=> '');
-      throw new Error('向量化失敗（HTTP ' + res.status + '）：' + t.slice(0,200));
-    }
-    return await res.json();
-  }
-
-  async function buildIndex(){
-    if (!settings.token) { openSettings(); return; }
-    buildBtn.disabled = true;
-    progressWrap.hidden = false;
-    const vectors = new Array(DOCS.length);
-    try {
-      for (let i = 0; i < DOCS.length; i += BATCH_SIZE) {
-        const batch = DOCS.slice(i, i + BATCH_SIZE).map(d => d.text.slice(0, 3000));
-        const embs = await embedBatch(batch, settings.token);
-        for (let j = 0; j < embs.length; j++) vectors[i+j] = embs[j];
-        const done = Math.min(i + BATCH_SIZE, DOCS.length);
-        progressBar.style.width = Math.round(done/DOCS.length*100) + '%';
-        progressLabel.textContent = '正在建立向量索引… ' + done + '/' + DOCS.length;
-      }
-      index = { sig: corpusSignature(), vectors };
-      const ok = safeStorageSet(STORE_KEY, JSON.stringify(index));
-      progressLabel.textContent = ok ? '索引建立完成，已快取於瀏覽器。' : '索引建立完成（快取失敗，下次開啟需重建）。';
-    } catch (err) {
-      progressLabel.textContent = '建立索引時發生錯誤：' + err.message;
-    } finally {
-      buildBtn.disabled = false;
-      renderIndexStatus();
-      setTimeout(()=>{ progressWrap.hidden = true; }, 1500);
-    }
-  }
-  buildBtn.addEventListener('click', buildIndex);
-
-  function cosineSim(a, b){
-    let dot=0, na=0, nb=0;
-    for (let i=0;i<a.length;i++){ dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
-    return dot / (Math.sqrt(na)*Math.sqrt(nb) + 1e-9);
-  }
-
-  function retrieve(qVec, k){
-    const scored = DOCS.map((d, i) => ({ doc:d, score: cosineSim(qVec, index.vectors[i]) }));
-    scored.sort((a,b)=> b.score - a.score);
-    return scored.slice(0, k);
-  }
-
+  // ---------- helpers ----------
   function formatLoc(d){
     let s = '';
     if (d.menu) s += d.menu;
     if (d.sub_menu) s += '／' + d.sub_menu;
-    if (d.page) s += '（印刷頁' + d.page + (d.leaf ? '／葉' + d.leaf : '') + '）';
+    if (d.page) s += '（印刷頁' + String(d.page).replace(/^印刷頁/, '') + (d.leaf ? '／葉' + d.leaf : '') + '）';
     return s || d.source;
   }
 
+  function highlightInto(container, text, qSet){
+    const chars = Array.from(text);
+    const marked = new Array(chars.length).fill(false);
+    for (let i = 0; i < chars.length - 1; i++) {
+      if (qSet.has(chars[i] + chars[i+1])) { marked[i] = true; marked[i+1] = true; }
+    }
+    let i = 0;
+    while (i < chars.length) {
+      let j = i;
+      while (j < chars.length && marked[j] === marked[i]) j++;
+      const seg = chars.slice(i, j).join('');
+      if (marked[i]) {
+        const m = document.createElement('mark');
+        m.textContent = seg;
+        container.appendChild(m);
+      } else {
+        container.appendChild(document.createTextNode(seg));
+      }
+      i = j;
+    }
+  }
+
+  function buildPassages(hits, qSet, openCount){
+    const box = document.createElement('div');
+    box.className = 'passages';
+    hits.forEach((h, idx) => {
+      const det = document.createElement('details');
+      det.className = 'passage';
+      if (idx < openCount) det.open = true;
+      const sum = document.createElement('summary');
+      sum.textContent = '【' + (idx + 1) + '】' + formatLoc(h.doc) + '　來源：' + h.doc.source + '　相關度 ' + h.rel + '%';
+      det.appendChild(sum);
+      const txt = document.createElement('div');
+      txt.className = 'source-text';
+      highlightInto(txt, h.doc.text, qSet);
+      det.appendChild(txt);
+      box.appendChild(det);
+    });
+    return box;
+  }
+
+  // ---------- Claude ----------
   function buildSystemPrompt(){
     return '你是協助整理與校讀《白氏六帖事類集》的研究助理，服務對象是研究中國法制史／古典文獻的博士生。'
-      + '你只能根據使用者訊息中「檢索到的原文段落」作答，這些段落來自使用者團隊正在數位化的《白氏六帖事類集》前言與卷第一（含卷一總目、正文、校勘表），'
-      + '目前尚未涵蓋卷二至卷三十。回答規則：\n'
-      + '1. 一律使用繁體中文，語氣精確、避免臆測。\n'
+      + '你只能根據使用者訊息中「檢索到的原文段落」作答；這些段落由本機字詞比對檢索而來，來自使用者團隊正在數位化的前言與卷第一（含卷一總目、正文、校勘表），'
+      + '尚未涵蓋卷二至卷三十，且可能漏掉用字不同但語意相關的段落。回答規則：\n'
+      + '1. 一律使用繁體中文與臺灣慣用語（避免「信息」「默認」「軟件」等大陸用語），語氣精確、避免臆測。\n'
       + '2. 引用具體字句或事目時，於句末以括號標明出處，格式如：（天第一，印刷頁十／葉二ウ）；若引自校勘表，標明「校勘表：<位置>」。\n'
-      + '3. 若提供的段落不足以回答問題，請誠實說明「目前語料庫（前言＋卷一）未涵蓋此內容」，切勿杜撰原文或校勘結論。\n'
+      + '3. 若提供的段落不足以回答問題，請誠實說明「目前檢索到的段落（前言＋卷一）未涵蓋此內容」，並可建議改用原文用字再問；切勿杜撰原文或校勘結論。\n'
       + '4. 原文為未加標點之文言錄文，部分字句因刻版漫漶而空缺（以空格表示），回答時可指出此點，不必勉強補足。';
   }
 
   function buildUserMessage(question, hits){
-    let s = '【使用者提問】\n' + question + '\n\n【檢索到的原文段落（依相關度排序）】\n';
+    let s = '【使用者提問】\n' + question + '\n\n【檢索到的原文段落（本機字詞檢索，依相關度排序）】\n';
     hits.forEach((h, idx) => {
-      s += '\n◆ 段落' + (idx+1) + '｜' + formatLoc(h.doc) + '｜來源：' + h.doc.source + '\n' + h.doc.text;
+      s += '\n◆ 段落' + (idx + 1) + '｜' + formatLoc(h.doc) + '｜來源：' + h.doc.source + '\n' + h.doc.text + '\n';
     });
     return s;
   }
 
-  async function chatCompletion(messages, model, token){
-    const res = await fetch(CHAT_URL, {
-      method:'POST',
-      headers:{ 'Authorization':'Bearer '+token, 'Content-Type':'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: 900, temperature: 0.25 })
-    });
-    if (!res.ok) {
-      const t = await res.text().catch(()=> '');
-      throw new Error('生成回答失敗（HTTP ' + res.status + '）：' + t.slice(0,200));
+  async function callClaude(system, userMsg){
+    let res;
+    try {
+      res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'x-api-key': settings.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: settings.model || DEFAULT_MODEL,
+          max_tokens: 1500,
+          system,
+          messages: [{ role: 'user', content: userMsg }]
+        })
+      });
+    } catch (e) {
+      throw new Error('無法連線到 api.anthropic.com，請檢查網路連線或瀏覽器的擴充功能是否擋下請求。');
     }
-    const data = await res.json();
-    return data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : '(無回應內容)';
+    const raw = await res.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch(e){}
+    if (!res.ok) {
+      const msg = data && data.error && data.error.message ? data.error.message : raw.slice(0, 200);
+      let hint = '';
+      if (res.status === 401) hint = '（API Key 無效或已被撤銷，請到「設定」重新輸入）';
+      else if (res.status === 404) hint = '（找不到這個模型 ID，請到「設定」更換模型）';
+      else if (res.status === 429) hint = '（請求過於頻繁或超出用量上限，請稍後再試）';
+      else if (res.status === 400 && /credit balance/i.test(msg)) hint = '（Anthropic 帳戶餘額不足，請至 console.anthropic.com 儲值）';
+      throw new Error('HTTP ' + res.status + '：' + msg + hint);
+    }
+    const text = (data && data.content ? data.content : []).filter(b => b.type === 'text').map(b => b.text).join('');
+    return text || '(無回應內容)';
   }
 
-  function addMessage(role, contentHtmlBuilder){
+  // ---------- chat UI ----------
+  function addMessage(role, build){
     emptyState.hidden = true;
     const wrap = document.createElement('div');
     wrap.className = 'msg ' + role;
     chatLog.appendChild(wrap);
-    contentHtmlBuilder(wrap);
-    wrap.scrollIntoView({behavior:'smooth', block:'end'});
+    build(wrap);
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'end' });
     return wrap;
   }
-
   function addUserMessage(text){
     addMessage('user', (wrap) => {
       const b = document.createElement('div');
@@ -630,73 +829,50 @@ button.mini:disabled{opacity:.5;cursor:default;}
       wrap.appendChild(b);
     });
   }
-
-  function addAssistantPending(){
+  function addAssistantPending(text){
     let bubbleRef;
-    const wrap = addMessage('assistant', (wrap) => {
+    const wrap = addMessage('assistant', (w) => {
       const b = document.createElement('div');
       b.className = 'bubble pending';
-      b.textContent = '正在檢索與生成回答…';
-      wrap.appendChild(b);
+      b.textContent = text;
+      w.appendChild(b);
       bubbleRef = b;
     });
     return { wrap, bubble: bubbleRef };
   }
 
-  function renderAssistantAnswer(bubble, wrap, answer, hits){
+  function renderRetrievalOnly(bubble, wrap, hits, qSet){
     bubble.className = 'bubble';
-    bubble.textContent = answer;
-    if (hits && hits.length){
+    bubble.textContent = '以下是與提問最相關的原文段落（共 ' + hits.length + ' 段，依相關度排序；命中的字詞已標示）：';
+    wrap.appendChild(buildPassages(hits, qSet, 3));
+  }
+
+  async function askQuestion(question){
+    addUserMessage(question);
+    const generating = useGeneration();
+    const { wrap, bubble } = addAssistantPending(generating ? '正在檢索並請 Claude 整理回答…' : '正在檢索…');
+    const { hits, qSet } = retrieve(question, TOP_K);
+    if (!hits.length) {
+      bubble.className = 'bubble';
+      bubble.textContent = '語料庫（前言＋卷一）中找不到與提問用字相符的段落。可以換個說法，或改用原文裡的字詞（例如典故原句、門類名稱）再問一次。';
+      return;
+    }
+    if (!generating) { renderRetrievalOnly(bubble, wrap, hits, qSet); return; }
+    try {
+      const answer = await callClaude(buildSystemPrompt(), buildUserMessage(question, hits));
+      bubble.className = 'bubble';
+      bubble.textContent = answer;
       const details = document.createElement('details');
       details.className = 'sources';
       const summary = document.createElement('summary');
       summary.textContent = '本次引用原文段落（' + hits.length + '）';
       details.appendChild(summary);
-      hits.forEach(h => {
-        const item = document.createElement('div');
-        item.className = 'source-item';
-        const tag = document.createElement('span');
-        tag.className = 'source-tag';
-        tag.textContent = formatLoc(h.doc) + '　相似度 ' + h.score.toFixed(3);
-        item.appendChild(tag);
-        const txt = document.createElement('div');
-        txt.className = 'source-text';
-        txt.textContent = h.doc.text;
-        item.appendChild(txt);
-        details.appendChild(item);
-      });
+      details.appendChild(buildPassages(hits, qSet, 0));
       wrap.appendChild(details);
-    }
-  }
-
-  async function askQuestion(question){
-    if (!settings.token) { openSettings(); return; }
-    addUserMessage(question);
-    const { wrap, bubble } = addAssistantPending();
-    try {
-      if (!index || index.vectors.length !== DOCS.length) {
-        bubble.textContent = '尚未建立索引，正在自動建立（僅需一次）…';
-        await buildIndex();
-        if (!index || index.vectors.length !== DOCS.length) {
-          bubble.className = 'bubble error';
-          bubble.textContent = '索引建立失敗，請點左側「建立／重建向量索引」重試，或確認 Token 是否正確。';
-          return;
-        }
-      }
-      bubble.textContent = '正在向量化提問…';
-      const qEmbArr = await embedBatch([question], settings.token);
-      const qVec = qEmbArr[0];
-      const hits = retrieve(qVec, TOP_K);
-      bubble.textContent = '正在請模型生成回答…';
-      const messages = [
-        { role:'system', content: buildSystemPrompt() },
-        { role:'user', content: buildUserMessage(question, hits) }
-      ];
-      const answer = await chatCompletion(messages, settings.model || 'deepseek-ai/DeepSeek-V3', settings.token);
-      renderAssistantAnswer(bubble, wrap, answer, hits);
     } catch (err) {
       bubble.className = 'bubble error';
-      bubble.textContent = '發生錯誤：' + err.message;
+      bubble.textContent = '呼叫 Claude 失敗：' + err.message + '\n（下方仍列出本機檢索到的原文段落。）';
+      wrap.appendChild(buildPassages(hits, qSet, 3));
     }
   }
 
@@ -708,7 +884,7 @@ button.mini:disabled{opacity:.5;cursor:default;}
     askQuestion(q);
   });
   questionInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendBtn.click();
     }
@@ -727,7 +903,7 @@ button.mini:disabled{opacity:.5;cursor:default;}
       const btn = document.createElement('button');
       btn.textContent = name;
       btn.addEventListener('click', () => {
-        questionInput.value = '卷一「' + name + '」門下收錄哪些事目？請引用原文。';
+        questionInput.value = '卷一「' + name.trim() + '」門下收錄哪些事目？請引用原文。';
         questionInput.focus();
         autoResize();
       });

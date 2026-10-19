@@ -1,28 +1,29 @@
 # 六帖問對
 
-以《白氏六帖事類集》前言與卷第一（正文＋校勘表）為語料庫的檢索增強問答（RAG）工具。
+以《白氏六帖事類集》前言與卷第一（正文＋校勘表）為語料庫的檢索問答工具。
 
-- 向量化：BAAI/bge-m3（Hugging Face Inference Providers）
-- 生成：DeepSeek-V3（可切換 Qwen2.5-72B / Llama-3.3-70B）
-- 所有 API 呼叫皆由使用者瀏覽器直接發出；Hugging Face API Token 僅存於瀏覽器 localStorage
+線上使用：https://lunlun48.github.io/baishi-liutie-rag/
 
-線上使用：啟用 GitHub Pages 後於 `https://lunlun48.github.io/baishi-liutie-rag/` 開啟。
+## 運作方式
+
+- **檢索**：完全在使用者的瀏覽器內完成（二字詞 BM25，並對「風第十三」這類門類名稱加權）。免費、不需任何 token、不必事先建立索引。
+- **回答**：預設只列出檢索到的原文段落（命中字詞會標示）。若在「⚙ 設定」填入自己的 Claude API Key，會改由 Claude 根據這些段落整理成回答，並標明出處。
+- 檢索以字詞比對為主，提問時帶入原文用字、典故原句或門類名稱，命中會更準。
 
 目前僅收錄前言＋卷一（正文 66 段＋校勘表 30 條），卷二至卷三十尚待數位化。
 
-## Token 說明
+## 金鑰與隱私
 
-第一次開啟網站會跳出設定視窗，需自行輸入 Hugging Face Access Token（至 huggingface.co →
-Settings → Access Tokens 建立一組具 Inference 權限的 Token）。Token 只存在使用者自己瀏覽器的
-localStorage，不會寫入原始碼或 repo。
+- Claude API Key 只存在使用者自己瀏覽器的 localStorage（可在設定取消「記住金鑰」，或一鍵清除），**不會寫入原始碼或這個 repo**。
+- 只有在使用 Claude 整理回答時，提問與檢索到的原文段落才會直接從瀏覽器送到 api.anthropic.com；僅列原文模式不會連線到任何外部服務。
 
-若出現 `HTTP 402 You have no remaining credits`，代表該 Hugging Face 帳號的 Inference Providers
-額度已用完，需儲值預付額度或訂閱 PRO；換 token 無法解決。
+## 為什麼不用 Hugging Face / 內建共用 token
 
-另有一版「本機字詞檢索（免 token）＋ 選填 Claude API Key」的實作，保留在 git 歷史
-（commit `91f861e`），需要時可還原。
+早期版本用 Hugging Face Inference Providers 做向量化與生成，後來放棄：
 
-**曾經嘗試過的做法（已放棄）**：把共用 token 直接寫死在 `index.html` 裡，讓所有人開啟即可用、不用
-自行輸入。結果行不通——GitHub 與 Hugging Face 有 secret-scanning 合作機制，只要偵測到公開 repo
-裡出現 Hugging Face token，即使手動允許 push 通過，Hugging Face 端仍會在幾分鐘內自動撤銷該
-token（連續驗證過三組 token，皆在 push 後迅速失效）。因此**不要**把任何真實 token 寫進這個 repo。
+1. 把共用 token 寫進公開 repo 行不通——GitHub 與 Hugging Face 的 secret-scanning 機制會讓該 token 在 push 後很快失效。
+2. Hugging Face 帳號的 Inference 額度用完後，所有請求都會回 HTTP 402，需要儲值或訂閱 PRO。
+
+因此改為本機檢索，生成則由使用者自備 Claude API Key。**請勿把任何真實金鑰 commit 進這個 repo。**
+
+舊的 Hugging Face 向量檢索版（使用者自備 token）保留在 git 歷史，commit `80fba7c`。
