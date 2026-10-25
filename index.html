@@ -403,29 +403,25 @@ mark{
   border-radius:8px;
 }
 .token-row select{flex:1;min-width:0;}
+.adv{margin:0 0 12px;}
+.adv summary{cursor:pointer;font-size:.8rem;color:var(--ink-soft);}
+.small-note a{color:var(--accent);}
 </style>
 
 <div class="app">
   <header class="top">
     <div class="title-block">
       <h1 class="serif">六帖問對</h1>
-      <p>《白氏六帖事類集》前言＋卷一、卷三至卷七 · 本機檢索問答</p>
+      <p>《白氏六帖事類集》檢索問答</p>
     </div>
     <button class="gear-btn" id="openSettings">⚙ 設定</button>
   </header>
 
   <div class="layout">
     <aside class="sidebar panel">
+      <p class="small-note" style="margin:0;">已收錄：前言＋卷一、卷三至卷七（<span id="docCount"></span> 段）</p>
       <div>
-        <h2>語料庫</h2>
-        <div class="status-row"><span>已收錄段落</span><span class="v mono" id="docCount">—</span></div>
-        <div class="status-row"><span>涵蓋範圍</span><span class="v">前言＋卷一、卷三至卷七</span></div>
-        <div class="status-row"><span>檢索方式</span><span class="v"><span class="dot ok"></span>本機字詞檢索</span></div>
-        <div class="status-row"><span>回答方式</span><span class="v" id="modeStatus"></span></div>
-        <p class="small-note" style="margin-top:8px;">檢索在您的瀏覽器內完成，免費、不需任何 token，也不必事先建立索引。</p>
-      </div>
-      <div>
-        <h2>各卷總目（點選插入提問）</h2>
+        <h2>各卷總目</h2>
         <select class="vol-select" id="tocVolume" aria-label="選擇卷次"></select>
         <div class="toc-list" id="tocList"></div>
       </div>
@@ -437,12 +433,12 @@ mark{
         <div class="chat-log" id="chatLog">
           <div class="empty-state" id="emptyState">
             <h3 class="serif">與《白氏六帖事類集》對話</h3>
-            <p>已收錄前言與卷一、卷三至卷七的總目、正文（共 308 個段落），以及卷一、卷六、卷七的校勘表；卷二與卷八至卷三十尚未收錄。卷三、四、五的稿件沒有印刷頁標記，引用時只標示門類。檢索以「字詞比對」為主，提問時盡量帶入原文用字、典故原句或門類名稱，命中會更準。</p>
+            <p>用原文裡的字詞發問，找得比較準。</p>
             <div class="examples" id="exampleChips"></div>
           </div>
         </div>
         <div class="input-row">
-          <textarea id="questionInput" placeholder="輸入問題，例如：卷一「地第二」門下收錄哪些事目？" rows="1"></textarea>
+          <textarea id="questionInput" placeholder="輸入問題，例如：「天圓不中規」出自何處？" rows="1"></textarea>
           <button class="send-btn" id="sendBtn">送出</button>
         </div>
       </div>
@@ -454,41 +450,39 @@ mark{
   <div class="modal">
     <button class="close-x" id="closeSettings">✕</button>
     <h2 class="serif">設定</h2>
-    <p class="small-note" style="margin-top:-4px;margin-bottom:14px;">
-      不填金鑰也能使用：此時只會列出檢索到的原文段落。填入任一家服務的金鑰後，由該模型根據這些段落整理成回答。Gemini、Groq、OpenRouter、Mistral 都有免費額度，各自在官網申請，每人用自己的金鑰。
-    </p>
+    <p class="small-note" style="margin:-4px 0 14px;">不填金鑰也能用（只列原文）。填入金鑰後，由模型整理成回答。</p>
     <div class="field">
       <label>回答服務</label>
       <select id="providerSelect"></select>
     </div>
     <div class="field">
-      <label id="keyLabel">API Key（選填）</label>
+      <label id="keyLabel">API Key</label>
       <div class="token-row">
         <input type="password" id="keyInput" placeholder="" autocomplete="off">
         <button class="mini" id="toggleKeyVisibility" style="width:auto;padding:8px 10px;">顯示</button>
       </div>
       <p class="small-note" id="providerNote" style="margin-top:6px;"></p>
     </div>
-    <div class="field">
-      <label>模型</label>
-      <div class="token-row">
-        <select id="modelSelect" aria-label="選擇模型"></select>
-        <button class="mini" id="loadModels" style="width:auto;padding:8px 10px;white-space:nowrap;">載入可用模型</button>
+    <details class="adv">
+      <summary>進階：選擇模型</summary>
+      <div class="field" style="margin-top:10px;">
+        <div class="token-row">
+          <select id="modelSelect" aria-label="選擇模型"></select>
+          <button class="mini" id="loadModels" style="width:auto;padding:8px 10px;white-space:nowrap;">載入清單</button>
+        </div>
+        <input type="text" id="modelInput" autocomplete="off" placeholder="輸入模型 ID" style="margin-top:6px;" hidden>
+        <p class="small-note" id="modelMsg" style="margin-top:6px;"></p>
       </div>
-      <input type="text" id="modelInput" autocomplete="off" placeholder="輸入模型 ID" style="margin-top:6px;" hidden>
-      <p class="small-note" id="modelMsg" style="margin-top:6px;"></p>
-    </div>
-    <label class="check-row"><input type="checkbox" id="rememberKey"><span>在此瀏覽器記住金鑰（取消勾選則只保留到關閉或重新整理頁面）</span></label>
-    <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列出檢索到的原文，不呼叫任何模型（即使已填金鑰）</span></label>
+    </details>
+    <label class="check-row"><input type="checkbox" id="rememberKey"><span>在這個瀏覽器記住金鑰</span></label>
+    <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列原文，不呼叫模型</span></label>
     <div class="settings-msg" id="settingsMsg"></div>
     <div class="modal-actions">
       <button id="cancelSettings">取消</button>
       <button class="primary" id="saveSettings">儲存</button>
     </div>
-    <button class="mini clear-key" id="clearKeyBtn">清除此瀏覽器已儲存的金鑰</button>
-    <p class="small-note">
-      檢索完全在本機進行。只有在使用所選服務整理回答時，您的提問與檢索到的原文段落才會直接從瀏覽器送到該服務（Claude：api.anthropic.com；Gemini：generativelanguage.googleapis.com；Groq：api.groq.com；OpenRouter：openrouter.ai；Mistral：api.mistral.ai），用量與費用依各服務規定；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
-    </p>
+    <button class="mini clear-key" id="clearKeyBtn">清除已儲存的金鑰</button>
+    <p class="small-note">金鑰只存在你的瀏覽器。提問與檢索到的段落會直接送到你選的服務。</p>
   </div>
 </div>
 
@@ -673,9 +667,8 @@ mark{
   const sendBtn = el('sendBtn');
   const tocList = el('tocList');
   const exampleChips = el('exampleChips');
-  const modeStatus = el('modeStatus');
   const modeBanner = el('modeBanner');
-  el('docCount').textContent = DOCS.length + ' 段';
+  el('docCount').textContent = String(DOCS.length);
 
   function safeStorageGet(key){ try { return localStorage.getItem(key); } catch(e){ return null; } }
   function safeStorageSet(key, val){ try { localStorage.setItem(key, val); return true; } catch(e){ return false; } }
@@ -688,27 +681,35 @@ mark{
   // ---------- settings ----------
   const PROVIDERS = {
     gemini: {
-      label: 'Gemini（Google，有免費額度）', short: 'Gemini', host: 'generativelanguage.googleapis.com', api: 'gemini',
+      label: 'Gemini（免費）', short: 'Gemini', host: 'generativelanguage.googleapis.com', api: 'gemini',
       placeholder: 'AIza…', defModel: 'gemini-flash-latest',
       models: ['gemini-flash-latest', 'gemini-flash-lite-latest'],
       keyUrl: 'https://aistudio.google.com/apikey', prefix: /^AIza/,
-      note: '用 Google 帳號到 Google AI Studio 免費申請，不需信用卡。免費額度只能用部分模型（多為 Flash／Flash-Lite 系列），有每分鐘／每日次數上限；依 Google 條款，免費額度下的輸入內容可能被用於改進其產品。'
+      note: '免費，不需信用卡。免費額度下，內容可能被 Google 用於改進產品。'
+    },
+    deepseek: {
+      label: 'DeepSeek（付費，便宜）', short: 'DeepSeek', host: 'api.deepseek.com', api: 'openai', maxTokens: 3000,
+      url: 'https://api.deepseek.com/chat/completions', modelsUrl: 'https://api.deepseek.com/models',
+      placeholder: 'sk-…', defModel: 'deepseek-chat',
+      models: ['deepseek-chat', 'deepseek-reasoner'],
+      keyUrl: 'https://platform.deepseek.com/api_keys', prefix: null,
+      note: '需儲值，用量計費；新帳號可能有試用額度。提問內容會送到 DeepSeek（中國公司）的伺服器。'
     },
     groq: {
-      label: 'Groq（有免費額度）', short: 'Groq', host: 'api.groq.com', api: 'openai',
+      label: 'Groq（免費）', short: 'Groq', host: 'api.groq.com', api: 'openai',
       url: 'https://api.groq.com/openai/v1/chat/completions', modelsUrl: 'https://api.groq.com/openai/v1/models',
       placeholder: 'gsk_…', defModel: 'llama-3.3-70b-versatile',
       models: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3-32b', 'llama-3.1-8b-instant'],
       keyUrl: 'https://console.groq.com/keys', prefix: /^gsk_/,
-      note: '到 console.groq.com 免費申請，不需信用卡；有每分鐘／每日次數上限。'
+      note: '免費，不需信用卡。'
     },
     openrouter: {
-      label: 'OpenRouter（有免費模型）', short: 'OpenRouter', host: 'openrouter.ai', api: 'openai',
+      label: 'OpenRouter（有免費模型）', short: 'OpenRouter', host: 'openrouter.ai', api: 'openai', maxTokens: 3000,
       url: 'https://openrouter.ai/api/v1/chat/completions', modelsUrl: 'https://openrouter.ai/api/v1/models', keyOptionalForModels: true,
       placeholder: 'sk-or-…', defModel: 'openrouter/free',
       models: ['openrouter/free', 'google/gemma-4-31b-it:free', 'nvidia/nemotron-3-super-120b-a12b:free'],
       keyUrl: 'https://openrouter.ai/keys', prefix: /^sk-or-/,
-      note: '到 openrouter.ai 註冊並建立金鑰；只有結尾是「:free」的模型免費（「openrouter/free」會自動挑一個免費模型），免費模型每日次數有限，各模型的資料政策不同。免費模型常常更換，請用「載入可用模型」查最新清單。'
+      note: '有免費模型（名稱結尾為 :free），每日次數有限。'
     },
     mistral: {
       label: 'Mistral（有免費方案）', short: 'Mistral', host: 'api.mistral.ai', api: 'openai',
@@ -716,17 +717,17 @@ mark{
       placeholder: '（Mistral 金鑰）', defModel: 'mistral-small-latest',
       models: ['mistral-small-latest', 'mistral-large-latest', 'open-mistral-nemo'],
       keyUrl: 'https://console.mistral.ai/api-keys', prefix: null,
-      note: '到 console.mistral.ai 註冊並建立金鑰；依第三方整理，免費方案（Experiment）需同意資料可用於訓練。'
+      note: '有免費方案；依第三方整理，需同意資料可用於訓練。'
     },
     claude: {
-      label: 'Claude（Anthropic，付費）', short: 'Claude', host: 'api.anthropic.com', api: 'claude',
+      label: 'Claude（付費）', short: 'Claude', host: 'api.anthropic.com', api: 'claude',
       placeholder: 'sk-ant-…', defModel: 'claude-sonnet-4-6',
       models: ['claude-sonnet-4-6', 'claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-haiku-4-5-20251001'],
       keyUrl: 'https://console.anthropic.com/settings/keys', prefix: /^sk-ant-/,
-      note: '依 Anthropic API 用量計費，需先在 console.anthropic.com 儲值。'
+      note: '付費，依 API 用量計費。'
     }
   };
-  const PROVIDER_ORDER = ['gemini', 'groq', 'openrouter', 'mistral', 'claude'];
+  const PROVIDER_ORDER = ['gemini', 'deepseek', 'groq', 'openrouter', 'mistral', 'claude'];
   const fetchedModels = {};   // 本次開啟頁面期間，各服務「載入可用模型」的結果
 
   let settings = {
@@ -771,16 +772,9 @@ mark{
 
   function renderMode(){
     const P = PROVIDERS[settings.provider];
-    if (useGeneration()) {
-      modeStatus.innerHTML = '<span class="dot ok"></span><span id="modeProv"></span> 整理回答';
-      modeStatus.querySelector('#modeProv').textContent = P.short;
-      modeBanner.innerHTML = '回答由 <b></b> 根據本機檢索到的原文段落整理；檢索在您的瀏覽器內完成，只有提問與檢索到的段落會送往 <span id="modeHost"></span>。';
-      modeBanner.querySelector('b').textContent = P.short + ' ' + curModel();
-      modeBanner.querySelector('#modeHost').textContent = P.host;
-    } else {
-      modeStatus.innerHTML = '<span class="dot mid"></span>僅列原文';
-      modeBanner.innerHTML = '目前為<b>「僅列原文」</b>模式：直接顯示檢索到的原文段落，不會連線到任何外部服務。若要由模型整理成回答，請到「⚙ 設定」選擇服務並輸入金鑰（Gemini、Groq 有免費額度）。';
-    }
+    modeBanner.textContent = useGeneration()
+      ? '由 ' + P.short + '（' + curModel() + '）整理回答'
+      : '目前只列出原文。要讓模型整理回答，請到「⚙ 設定」填入金鑰。';
   }
 
   const settingsOverlay = el('settingsOverlay');
@@ -877,7 +871,7 @@ mark{
       const keep = currentModelValue();
       fetchedModels[p] = ids;
       renderModelSelect(p, keep && ids.includes(keep) ? keep : (ids.includes(P.defModel) ? P.defModel : ids[0]));
-      modelMsg.textContent = '已載入 ' + ids.length + ' 個模型' + (p === 'openrouter' ? '（僅列免費模型）' : '') + (p === 'gemini' ? '（含需付費的模型；免費額度只能用部分）' : '') + '。';
+      modelMsg.textContent = '已載入 ' + ids.length + ' 個模型' + (p === 'openrouter' ? '（僅列免費）' : '') + (p === 'gemini' ? '（部分需付費）' : '') + '。';
     } catch (err) {
       modelMsg.textContent = '載入失敗：' + err.message;
     } finally { btn.disabled = false; }
@@ -894,12 +888,12 @@ mark{
     keyInput.placeholder = P.placeholder;
     renderModelSelect(p, draft.models[p] || P.defModel);
     modelMsg.textContent = '';
-    keyLabel.textContent = P.short + ' API Key（選填）';
+    keyLabel.textContent = P.short + ' 金鑰';
     providerNote.textContent = '';
     providerNote.appendChild(document.createTextNode(P.note + ' '));
     const a = document.createElement('a');
     a.href = P.keyUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    a.textContent = '前往申請／管理金鑰';
+    a.textContent = '申請金鑰';
     providerNote.appendChild(a);
   }
   providerSelect.addEventListener('change', () => { stashDraft(); loadDraft(providerSelect.value); });
@@ -1009,7 +1003,7 @@ mark{
       det.className = 'passage';
       if (idx < openCount) det.open = true;
       const sum = document.createElement('summary');
-      sum.textContent = '【' + (idx + 1) + '】' + formatLoc(h.doc) + '　來源：' + h.doc.source + '　相關度 ' + h.rel + '%';
+      sum.textContent = '【' + (idx + 1) + '】' + formatLoc(h.doc) + (h.doc.source === '校勘表' ? '　〔校勘表〕' : '');
       det.appendChild(sum);
       const txt = document.createElement('div');
       txt.className = 'source-text';
@@ -1063,7 +1057,7 @@ mark{
       url = P.url;
       headers = { 'authorization': 'Bearer ' + key, 'content-type': 'application/json' };
       body = {
-        model, max_tokens: settings.provider === 'openrouter' ? 3000 : 1500,
+        model, max_tokens: P.maxTokens || 1500,
         messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }]
       };
     }
@@ -1139,9 +1133,9 @@ mark{
     return { wrap, bubble: bubbleRef };
   }
 
-  function renderRetrievalOnly(bubble, wrap, hits, qSet){
+  function renderRetrievalOnly(bubble, wrap, hits, qSet, note){
     bubble.className = 'bubble';
-    bubble.textContent = (arguments[4] || '') + '以下是與提問最相關的原文段落（共 ' + hits.length + ' 段，依相關度排序；命中的字詞已標示）：';
+    bubble.textContent = (note || '') + '最相關的原文段落：';
     wrap.appendChild(buildPassages(hits, qSet, 3));
   }
 
@@ -1228,9 +1222,6 @@ mark{
   const examples = [
     '卷一總目共有哪些門類？',
     '「天圓不中規」出自何處？',
-    '卷五「酒第一」門收錄了哪些與酒德有關的事目？',
-    '卷四的劍、刀、鼎各有哪些典故？',
-    '校勘表中「離別贈貺」為何從參校本改定？',
     '卷七「姓氏第十六」為什麼要改？'
   ];
   examples.forEach(q => {

@@ -7,7 +7,7 @@
 ## 運作方式
 
 - **檢索**：完全在使用者的瀏覽器內完成（二字詞 BM25，並對「風第十三」這類門類名稱加權）。免費、不需任何 token、不必事先建立索引。
-- **回答**：預設只列出檢索到的原文段落（命中字詞會標示）。若在「⚙ 設定」選擇服務並填入自己的金鑰，會改由該模型根據這些段落整理成回答，並標明出處。可選 **Gemini（Google）**、**Groq**、**OpenRouter**、**Mistral**（皆有免費額度）或 **Claude（Anthropic，付費）**；設定裡的「載入可用模型」會用你的金鑰向該服務查最新模型清單。每個人用自己申請的金鑰。
+- **回答**：預設只列出檢索到的原文段落（命中字詞會標示）。若在「⚙ 設定」選擇服務並填入自己的金鑰，會改由該模型根據這些段落整理成回答，並標明出處。可選 **Gemini（Google）**、**Groq**、**OpenRouter**、**Mistral**（皆有免費額度）、**DeepSeek**（付費，價格低）或 **Claude（Anthropic，付費）**；設定裡的「載入可用模型」會用你的金鑰向該服務查最新模型清單。每個人用自己申請的金鑰。
 - 檢索以字詞比對為主，提問時帶入原文用字、典故原句或門類名稱，命中會更準。
 
 ## 收錄範圍
@@ -24,7 +24,7 @@
 ## 金鑰與隱私
 
 - 金鑰只存在使用者自己瀏覽器的 localStorage（可在設定取消「記住金鑰」，或一鍵清除），**不會寫入原始碼或這個 repo**。
-- 只有在使用模型整理回答時，提問與檢索到的原文段落才會直接從瀏覽器送到所選服務（api.anthropic.com／generativelanguage.googleapis.com／api.groq.com／openrouter.ai／api.mistral.ai）；僅列原文模式不會連線到任何外部服務。
+- 只有在使用模型整理回答時，提問與檢索到的原文段落才會直接從瀏覽器送到所選服務（api.anthropic.com／generativelanguage.googleapis.com／api.groq.com／openrouter.ai／api.mistral.ai／api.deepseek.com）；僅列原文模式不會連線到任何外部服務。
 - 免費額度有每分鐘／每日次數上限；依 Google 條款，Gemini 免費額度下的輸入內容可能被用於改進其產品。
 
 ## 為什麼不用 Hugging Face / 內建共用 token
