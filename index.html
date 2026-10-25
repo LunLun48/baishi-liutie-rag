@@ -402,6 +402,7 @@ mark{
   border:1px solid var(--line);
   border-radius:8px;
 }
+.token-row select{flex:1;min-width:0;}
 </style>
 
 <div class="app">
@@ -454,7 +455,7 @@ mark{
     <button class="close-x" id="closeSettings">✕</button>
     <h2 class="serif">設定</h2>
     <p class="small-note" style="margin-top:-4px;margin-bottom:14px;">
-      不填金鑰也能使用：此時只會列出檢索到的原文段落。填入任一家服務的金鑰後，由該模型根據這些段落整理成回答。Gemini 與 Groq 都有免費額度，各自在官網申請，每人用自己的金鑰。
+      不填金鑰也能使用：此時只會列出檢索到的原文段落。填入任一家服務的金鑰後，由該模型根據這些段落整理成回答。Gemini、Groq、OpenRouter、Mistral 都有免費額度，各自在官網申請，每人用自己的金鑰。
     </p>
     <div class="field">
       <label>回答服務</label>
@@ -469,9 +470,13 @@ mark{
       <p class="small-note" id="providerNote" style="margin-top:6px;"></p>
     </div>
     <div class="field">
-      <label>模型（可直接輸入模型 ID）</label>
-      <input type="text" id="modelInput" list="modelList" autocomplete="off">
-      <datalist id="modelList"></datalist>
+      <label>模型</label>
+      <div class="token-row">
+        <select id="modelSelect" aria-label="選擇模型"></select>
+        <button class="mini" id="loadModels" style="width:auto;padding:8px 10px;white-space:nowrap;">載入可用模型</button>
+      </div>
+      <input type="text" id="modelInput" autocomplete="off" placeholder="輸入模型 ID" style="margin-top:6px;" hidden>
+      <p class="small-note" id="modelMsg" style="margin-top:6px;"></p>
     </div>
     <label class="check-row"><input type="checkbox" id="rememberKey"><span>在此瀏覽器記住金鑰（取消勾選則只保留到關閉或重新整理頁面）</span></label>
     <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列出檢索到的原文，不呼叫任何模型（即使已填金鑰）</span></label>
@@ -482,7 +487,7 @@ mark{
     </div>
     <button class="mini clear-key" id="clearKeyBtn">清除此瀏覽器已儲存的金鑰</button>
     <p class="small-note">
-      檢索完全在本機進行。只有在使用所選服務整理回答時，您的提問與檢索到的原文段落才會直接從瀏覽器送到該服務（Claude：api.anthropic.com；Gemini：generativelanguage.googleapis.com；Groq：api.groq.com），用量與費用依各服務規定；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
+      檢索完全在本機進行。只有在使用所選服務整理回答時，您的提問與檢索到的原文段落才會直接從瀏覽器送到該服務（Claude：api.anthropic.com；Gemini：generativelanguage.googleapis.com；Groq：api.groq.com；OpenRouter：openrouter.ai；Mistral：api.mistral.ai），用量與費用依各服務規定；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
     </p>
   </div>
 </div>
@@ -682,29 +687,47 @@ mark{
 
   // ---------- settings ----------
   const PROVIDERS = {
-    claude: {
-      label: 'Claude（Anthropic，付費）', short: 'Claude', host: 'api.anthropic.com',
-      placeholder: 'sk-ant-…', defModel: 'claude-sonnet-4-6',
-      models: ['claude-sonnet-4-6', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-haiku-4-5-20251001'],
-      keyUrl: 'https://console.anthropic.com/settings/keys', prefix: /^sk-ant-/,
-      note: '依 Anthropic API 用量計費，需先在 console.anthropic.com 儲值。'
-    },
     gemini: {
-      label: 'Gemini（Google，有免費額度）', short: 'Gemini', host: 'generativelanguage.googleapis.com',
+      label: 'Gemini（Google，有免費額度）', short: 'Gemini', host: 'generativelanguage.googleapis.com', api: 'gemini',
       placeholder: 'AIza…', defModel: 'gemini-flash-latest',
       models: ['gemini-flash-latest', 'gemini-flash-lite-latest'],
       keyUrl: 'https://aistudio.google.com/apikey', prefix: /^AIza/,
-      note: '用 Google 帳號到 Google AI Studio 免費申請，不需信用卡。免費額度有每分鐘／每日次數上限；依 Google 條款，免費額度下的輸入內容可能被用於改進其產品。'
+      note: '用 Google 帳號到 Google AI Studio 免費申請，不需信用卡。免費額度只能用部分模型（多為 Flash／Flash-Lite 系列），有每分鐘／每日次數上限；依 Google 條款，免費額度下的輸入內容可能被用於改進其產品。'
     },
     groq: {
-      label: 'Groq（有免費額度）', short: 'Groq', host: 'api.groq.com',
+      label: 'Groq（有免費額度）', short: 'Groq', host: 'api.groq.com', api: 'openai',
+      url: 'https://api.groq.com/openai/v1/chat/completions', modelsUrl: 'https://api.groq.com/openai/v1/models',
       placeholder: 'gsk_…', defModel: 'llama-3.3-70b-versatile',
-      models: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'qwen/qwen3-32b'],
+      models: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3-32b', 'llama-3.1-8b-instant'],
       keyUrl: 'https://console.groq.com/keys', prefix: /^gsk_/,
-      note: '到 console.groq.com 免費申請，不需信用卡；有每分鐘／每日次數上限。模型清單會變動，若出現「找不到模型」請改填 Groq 官網列出的模型 ID。'
+      note: '到 console.groq.com 免費申請，不需信用卡；有每分鐘／每日次數上限。'
+    },
+    openrouter: {
+      label: 'OpenRouter（有免費模型）', short: 'OpenRouter', host: 'openrouter.ai', api: 'openai',
+      url: 'https://openrouter.ai/api/v1/chat/completions', modelsUrl: 'https://openrouter.ai/api/v1/models', keyOptionalForModels: true,
+      placeholder: 'sk-or-…', defModel: 'openrouter/free',
+      models: ['openrouter/free', 'google/gemma-4-31b-it:free', 'nvidia/nemotron-3-super-120b-a12b:free'],
+      keyUrl: 'https://openrouter.ai/keys', prefix: /^sk-or-/,
+      note: '到 openrouter.ai 註冊並建立金鑰；只有結尾是「:free」的模型免費（「openrouter/free」會自動挑一個免費模型），免費模型每日次數有限，各模型的資料政策不同。免費模型常常更換，請用「載入可用模型」查最新清單。'
+    },
+    mistral: {
+      label: 'Mistral（有免費方案）', short: 'Mistral', host: 'api.mistral.ai', api: 'openai',
+      url: 'https://api.mistral.ai/v1/chat/completions', modelsUrl: 'https://api.mistral.ai/v1/models',
+      placeholder: '（Mistral 金鑰）', defModel: 'mistral-small-latest',
+      models: ['mistral-small-latest', 'mistral-large-latest', 'open-mistral-nemo'],
+      keyUrl: 'https://console.mistral.ai/api-keys', prefix: null,
+      note: '到 console.mistral.ai 註冊並建立金鑰；依第三方整理，免費方案（Experiment）需同意資料可用於訓練。'
+    },
+    claude: {
+      label: 'Claude（Anthropic，付費）', short: 'Claude', host: 'api.anthropic.com', api: 'claude',
+      placeholder: 'sk-ant-…', defModel: 'claude-sonnet-4-6',
+      models: ['claude-sonnet-4-6', 'claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5', 'claude-fable-5-1', 'claude-haiku-4-5-20251001'],
+      keyUrl: 'https://console.anthropic.com/settings/keys', prefix: /^sk-ant-/,
+      note: '依 Anthropic API 用量計費，需先在 console.anthropic.com 儲值。'
     }
   };
-  const PROVIDER_ORDER = ['gemini', 'groq', 'claude'];
+  const PROVIDER_ORDER = ['gemini', 'groq', 'openrouter', 'mistral', 'claude'];
+  const fetchedModels = {};   // 本次開啟頁面期間，各服務「載入可用模型」的結果
 
   let settings = {
     provider: 'gemini', keys: {}, models: {}, remember: true, retrievalOnly: false
@@ -764,7 +787,8 @@ mark{
   const providerSelect = el('providerSelect');
   const keyInput = el('keyInput');
   const modelInput = el('modelInput');
-  const modelList = el('modelList');
+  const modelSelect = el('modelSelect');
+  const modelMsg = el('modelMsg');
   const providerNote = el('providerNote');
   const keyLabel = el('keyLabel');
   const rememberKey = el('rememberKey');
@@ -780,19 +804,97 @@ mark{
     providerSelect.appendChild(o);
   });
 
+  const CUSTOM = '@custom';
+  function currentModelValue(){
+    return modelSelect.value === CUSTOM ? modelInput.value.trim() : modelSelect.value;
+  }
+  function renderModelSelect(p, current){
+    const P = PROVIDERS[p];
+    const list = (fetchedModels[p] && fetchedModels[p].length ? fetchedModels[p] : P.models).slice();
+    if (current && !list.includes(current)) list.unshift(current);
+    modelSelect.textContent = '';
+    list.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; modelSelect.appendChild(o); });
+    const c = document.createElement('option'); c.value = CUSTOM; c.textContent = '其他（自行輸入模型 ID）…'; modelSelect.appendChild(c);
+    modelSelect.value = current || list[0];
+    modelInput.hidden = true;
+    modelInput.value = '';
+  }
+  modelSelect.addEventListener('change', () => {
+    if (modelSelect.value === CUSTOM) { modelInput.hidden = false; modelInput.focus(); }
+    else { modelInput.hidden = true; }
+  });
+
+  async function fetchModelIds(provider, key){
+    const P = PROVIDERS[provider];
+    let url, headers = {};
+    if (P.api === 'claude') {
+      url = 'https://api.anthropic.com/v1/models?limit=100';
+      headers = { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+    } else if (P.api === 'gemini') {
+      url = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200';
+      headers = { 'x-goog-api-key': key };
+    } else {
+      url = P.modelsUrl;
+      if (key && !P.keyOptionalForModels) headers = { 'authorization': 'Bearer ' + key };
+    }
+    let res;
+    try { res = await fetch(url, { method: 'GET', headers }); }
+    catch (e) { throw new Error('無法連線到 ' + P.host + '。'); }
+    const raw = await res.text();
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) {}
+    if (!res.ok) {
+      let msg = (data && data.error && (data.error.message || data.error)) || (data && data.detail) || raw.slice(0, 160);
+      if (typeof msg !== 'string') msg = JSON.stringify(msg).slice(0, 160);
+      throw new Error('HTTP ' + res.status + '：' + msg);
+    }
+    let ids = [];
+    if (P.api === 'gemini') {
+      ids = (data.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .map(m => String(m.name).replace(/^models\//, ''));
+    } else if (provider === 'openrouter') {
+      ids = (data.data || []).filter(m => /:free$/.test(m.id) || (m.pricing && Number(m.pricing.prompt) === 0 && Number(m.pricing.completion) === 0))
+        .map(m => m.id).filter(id => !/lyria|safety|guard|embed|tts|whisper/i.test(id));
+      if (!ids.includes('openrouter/free')) ids.unshift('openrouter/free');
+      return ids;
+    } else {
+      ids = (data.data || []).map(m => m.id);
+      if (provider === 'groq') ids = ids.filter(id => !/whisper|tts|guard|embed|playai|orpheus/i.test(id));
+      if (provider === 'mistral') ids = ids.filter(id => !/embed|moderation|ocr/i.test(id));
+    }
+    return Array.from(new Set(ids)).sort();
+  }
+  el('loadModels').addEventListener('click', async () => {
+    const p = providerSelect.value;
+    const P = PROVIDERS[p];
+    const key = keyInput.value.trim();
+    if (!key && !P.keyOptionalForModels) { modelMsg.textContent = '請先在上方輸入 ' + P.short + ' 金鑰，才能查詢可用模型。'; return; }
+    modelMsg.textContent = '查詢中…';
+    const btn = el('loadModels'); btn.disabled = true;
+    try {
+      const ids = await fetchModelIds(p, key);
+      if (!ids.length) { modelMsg.textContent = '查不到可用模型。'; return; }
+      const keep = currentModelValue();
+      fetchedModels[p] = ids;
+      renderModelSelect(p, keep && ids.includes(keep) ? keep : (ids.includes(P.defModel) ? P.defModel : ids[0]));
+      modelMsg.textContent = '已載入 ' + ids.length + ' 個模型' + (p === 'openrouter' ? '（僅列免費模型）' : '') + (p === 'gemini' ? '（含需付費的模型；免費額度只能用部分）' : '') + '。';
+    } catch (err) {
+      modelMsg.textContent = '載入失敗：' + err.message;
+    } finally { btn.disabled = false; }
+  });
+
   function stashDraft(){
     draft.keys[draftProvider] = keyInput.value.trim();
-    draft.models[draftProvider] = modelInput.value.trim();
+    draft.models[draftProvider] = currentModelValue();
   }
   function loadDraft(p){
     draftProvider = p;
     const P = PROVIDERS[p];
     keyInput.value = draft.keys[p] || '';
     keyInput.placeholder = P.placeholder;
-    modelInput.value = draft.models[p] || P.defModel;
+    renderModelSelect(p, draft.models[p] || P.defModel);
+    modelMsg.textContent = '';
     keyLabel.textContent = P.short + ' API Key（選填）';
-    modelList.textContent = '';
-    P.models.forEach(m => { const o = document.createElement('option'); o.value = m; modelList.appendChild(o); });
     providerNote.textContent = '';
     providerNote.appendChild(document.createTextNode(P.note + ' '));
     const a = document.createElement('a');
@@ -822,7 +924,7 @@ mark{
     el('toggleKeyVisibility').textContent = showing ? '顯示' : '隱藏';
   });
   function guessProviderOfKey(key){
-    for (const k of Object.keys(PROVIDERS)) if (PROVIDERS[k].prefix.test(key)) return k;
+    for (const k of Object.keys(PROVIDERS)) if (PROVIDERS[k].prefix && PROVIDERS[k].prefix.test(key)) return k;
     return null;
   }
   el('saveSettings').addEventListener('click', ()=>{
@@ -942,14 +1044,14 @@ mark{
     const model = curModel();
     const key = curKey();
     let url, headers, body;
-    if (settings.provider === 'claude') {
+    if (P.api === 'claude') {
       url = 'https://api.anthropic.com/v1/messages';
       headers = {
         'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json',
         'anthropic-dangerous-direct-browser-access': 'true'
       };
       body = { model, max_tokens: 1500, system, messages: [{ role: 'user', content: userMsg }] };
-    } else if (settings.provider === 'gemini') {
+    } else if (P.api === 'gemini') {
       url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model.replace(/^models\//, '')) + ':generateContent';
       headers = { 'x-goog-api-key': key, 'content-type': 'application/json' };
       body = {
@@ -958,10 +1060,10 @@ mark{
         generationConfig: { maxOutputTokens: 4096 }
       };
     } else {
-      url = 'https://api.groq.com/openai/v1/chat/completions';
+      url = P.url;
       headers = { 'authorization': 'Bearer ' + key, 'content-type': 'application/json' };
       body = {
-        model, max_tokens: 1500,
+        model, max_tokens: settings.provider === 'openrouter' ? 3000 : 1500,
         messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }]
       };
     }
@@ -977,18 +1079,20 @@ mark{
     if (!res.ok) {
       let msg = raw.slice(0, 200);
       if (data && data.error && data.error.message) msg = data.error.message;
-      else if (data && data.detail) msg = String(data.detail);
+      else if (data && data.detail) msg = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail).slice(0, 200);
+      else if (data && data.message) msg = String(data.message);
       let hint = '';
-      if (res.status === 401 || res.status === 403 || /api key not valid|invalid api key|API_KEY_INVALID/i.test(msg)) hint = '（金鑰無效、已被撤銷或沒有權限，請到「設定」重新輸入）';
-      else if (res.status === 404) hint = '（找不到這個模型 ID，請到「設定」更換模型）';
-      else if (res.status === 429) hint = '（請求太頻繁或已用完額度；免費額度有每分鐘／每日上限，請稍後再試）';
+      if (res.status === 401 || res.status === 403 || /api key not valid|invalid api key|API_KEY_INVALID|unauthorized/i.test(msg)) hint = '（金鑰無效、已被撤銷或沒有權限，請到「設定」重新輸入）';
+      else if (res.status === 404) hint = '（找不到這個模型 ID，請到「設定」按「載入可用模型」重新選擇）';
+      else if (res.status === 402) hint = '（帳戶餘額不足；若想用免費額度，請改選結尾為「:free」的模型）';
+      else if (res.status === 429) hint = '（請求太頻繁或已用完額度；免費額度有每分鐘／每日上限，請稍後再試，或換一個模型）';
       else if (res.status === 400 && /credit balance/i.test(msg)) hint = '（Anthropic 帳戶餘額不足，請至 console.anthropic.com 儲值）';
       throw new Error(P.short + ' HTTP ' + res.status + '：' + msg + hint);
     }
     let text = '';
-    if (settings.provider === 'claude') {
+    if (P.api === 'claude') {
       text = (data && data.content ? data.content : []).filter(b => b.type === 'text').map(b => b.text).join('');
-    } else if (settings.provider === 'gemini') {
+    } else if (P.api === 'gemini') {
       const cand = data && data.candidates && data.candidates[0];
       text = cand && cand.content && cand.content.parts ? cand.content.parts.map(p => p.text || '').join('') : '';
       if (!text && data && data.promptFeedback && data.promptFeedback.blockReason) {
@@ -997,8 +1101,10 @@ mark{
       if (cand && cand.finishReason === 'MAX_TOKENS') text += '\n（回答因長度上限被截斷）';
     } else {
       const ch = data && data.choices && data.choices[0];
-      text = ch && ch.message && ch.message.content ? ch.message.content : '';
-      text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      let c = ch && ch.message ? ch.message.content : '';
+      if (Array.isArray(c)) c = c.map(x => (typeof x === 'string' ? x : (x && x.text) || '')).join('');
+      text = String(c || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      if (ch && ch.finish_reason === 'length') text += '\n（回答因長度上限被截斷）';
     }
     return text || '(無回應內容)';
   }
