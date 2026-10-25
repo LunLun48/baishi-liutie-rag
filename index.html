@@ -454,27 +454,27 @@ mark{
     <button class="close-x" id="closeSettings">✕</button>
     <h2 class="serif">設定</h2>
     <p class="small-note" style="margin-top:-4px;margin-bottom:14px;">
-      不填 Claude API Key 也能使用：此時只會列出檢索到的原文段落。填入後，Claude 會根據這些段落整理成回答。
+      不填金鑰也能使用：此時只會列出檢索到的原文段落。填入任一家服務的金鑰後，由該模型根據這些段落整理成回答。Gemini 與 Groq 都有免費額度，各自在官網申請，每人用自己的金鑰。
     </p>
     <div class="field">
-      <label>Claude API Key（選填）</label>
-      <div class="token-row">
-        <input type="password" id="keyInput" placeholder="sk-ant-…" autocomplete="off">
-        <button class="mini" id="toggleKeyVisibility" style="width:auto;padding:8px 10px;">顯示</button>
-      </div>
+      <label>回答服務</label>
+      <select id="providerSelect"></select>
     </div>
     <div class="field">
-      <label>Claude 模型（可直接輸入模型 ID）</label>
+      <label id="keyLabel">API Key（選填）</label>
+      <div class="token-row">
+        <input type="password" id="keyInput" placeholder="" autocomplete="off">
+        <button class="mini" id="toggleKeyVisibility" style="width:auto;padding:8px 10px;">顯示</button>
+      </div>
+      <p class="small-note" id="providerNote" style="margin-top:6px;"></p>
+    </div>
+    <div class="field">
+      <label>模型（可直接輸入模型 ID）</label>
       <input type="text" id="modelInput" list="modelList" autocomplete="off">
-      <datalist id="modelList">
-        <option value="claude-sonnet-4-6"></option>
-        <option value="claude-sonnet-5"></option>
-        <option value="claude-opus-5-5"></option>
-        <option value="claude-haiku-4-5-20251001"></option>
-      </datalist>
+      <datalist id="modelList"></datalist>
     </div>
     <label class="check-row"><input type="checkbox" id="rememberKey"><span>在此瀏覽器記住金鑰（取消勾選則只保留到關閉或重新整理頁面）</span></label>
-    <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列出檢索到的原文，不呼叫 Claude（即使已填金鑰）</span></label>
+    <label class="check-row"><input type="checkbox" id="retrievalOnly"><span>只列出檢索到的原文，不呼叫任何模型（即使已填金鑰）</span></label>
     <div class="settings-msg" id="settingsMsg"></div>
     <div class="modal-actions">
       <button id="cancelSettings">取消</button>
@@ -482,7 +482,7 @@ mark{
     </div>
     <button class="mini clear-key" id="clearKeyBtn">清除此瀏覽器已儲存的金鑰</button>
     <p class="small-note">
-      檢索完全在本機進行。只有在使用 Claude 整理回答時，您的提問與檢索到的原文段落才會送到 api.anthropic.com，依您的 Claude API 用量計費；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
+      檢索完全在本機進行。只有在使用所選服務整理回答時，您的提問與檢索到的原文段落才會直接從瀏覽器送到該服務（Claude：api.anthropic.com；Gemini：generativelanguage.googleapis.com；Groq：api.groq.com），用量與費用依各服務規定；金鑰只會存在您自己的瀏覽器，不會寫入網站原始碼或 GitHub。請勿在公用電腦勾選「記住金鑰」。
     </p>
   </div>
 </div>
@@ -496,8 +496,6 @@ mark{
   "use strict";
   const DOCS = JSON.parse(document.getElementById('corpus-data').textContent);
   const TOP_K = 6;
-  const API_URL = 'https://api.anthropic.com/v1/messages';
-  const DEFAULT_MODEL = 'claude-sonnet-4-6';
   const SETTINGS_KEY = 'liutie_settings_v2';
 
   /*RETRIEVAL_START*/
@@ -683,51 +681,131 @@ mark{
   safeStorageRemove('liutie_settings');
 
   // ---------- settings ----------
-  let settings = { apiKey: '', model: DEFAULT_MODEL, remember: true, retrievalOnly: false };
+  const PROVIDERS = {
+    claude: {
+      label: 'Claude（Anthropic，付費）', short: 'Claude', host: 'api.anthropic.com',
+      placeholder: 'sk-ant-…', defModel: 'claude-sonnet-4-6',
+      models: ['claude-sonnet-4-6', 'claude-sonnet-5', 'claude-opus-5-5', 'claude-haiku-4-5-20251001'],
+      keyUrl: 'https://console.anthropic.com/settings/keys', prefix: /^sk-ant-/,
+      note: '依 Anthropic API 用量計費，需先在 console.anthropic.com 儲值。'
+    },
+    gemini: {
+      label: 'Gemini（Google，有免費額度）', short: 'Gemini', host: 'generativelanguage.googleapis.com',
+      placeholder: 'AIza…', defModel: 'gemini-flash-latest',
+      models: ['gemini-flash-latest', 'gemini-flash-lite-latest'],
+      keyUrl: 'https://aistudio.google.com/apikey', prefix: /^AIza/,
+      note: '用 Google 帳號到 Google AI Studio 免費申請，不需信用卡。免費額度有每分鐘／每日次數上限；依 Google 條款，免費額度下的輸入內容可能被用於改進其產品。'
+    },
+    groq: {
+      label: 'Groq（有免費額度）', short: 'Groq', host: 'api.groq.com',
+      placeholder: 'gsk_…', defModel: 'llama-3.3-70b-versatile',
+      models: ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b', 'qwen/qwen3-32b'],
+      keyUrl: 'https://console.groq.com/keys', prefix: /^gsk_/,
+      note: '到 console.groq.com 免費申請，不需信用卡；有每分鐘／每日次數上限。模型清單會變動，若出現「找不到模型」請改填 Groq 官網列出的模型 ID。'
+    }
+  };
+  const PROVIDER_ORDER = ['gemini', 'groq', 'claude'];
+
+  let settings = {
+    provider: 'gemini', keys: {}, models: {}, remember: true, retrievalOnly: false
+  };
   try {
     const raw = safeStorageGet(SETTINGS_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      settings = Object.assign(settings, {
-        apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
-        model: p.model || DEFAULT_MODEL,
-        remember: p.remember !== false,
-        retrievalOnly: !!p.retrievalOnly
-      });
+      settings.remember = p.remember !== false;
+      settings.retrievalOnly = !!p.retrievalOnly;
+      if (p.keys && typeof p.keys === 'object') {
+        for (const k of Object.keys(PROVIDERS)) if (typeof p.keys[k] === 'string') settings.keys[k] = p.keys[k];
+      }
+      if (p.models && typeof p.models === 'object') {
+        for (const k of Object.keys(PROVIDERS)) if (typeof p.models[k] === 'string') settings.models[k] = p.models[k];
+      }
+      if (PROVIDERS[p.provider]) settings.provider = p.provider;
+      // 舊版（只有 Claude）的格式
+      if (typeof p.apiKey === 'string' && p.apiKey && !(p.keys && p.keys.claude)) {
+        settings.keys.claude = p.apiKey;
+        if (p.model) settings.models.claude = p.model;
+        if (!p.provider) settings.provider = 'claude';
+      }
     }
   } catch(e){}
+  for (const k of Object.keys(settings.keys)) if (/^hf_/i.test(settings.keys[k])) settings.keys[k] = '';
+
+  function curKey(){ return settings.keys[settings.provider] || ''; }
+  function curModel(){ return settings.models[settings.provider] || PROVIDERS[settings.provider].defModel; }
 
   function persistSettings(){
     safeStorageSet(SETTINGS_KEY, JSON.stringify({
-      model: settings.model,
+      provider: settings.provider,
+      models: settings.models,
       remember: settings.remember,
       retrievalOnly: settings.retrievalOnly,
-      apiKey: settings.remember ? settings.apiKey : ''
+      keys: settings.remember ? settings.keys : {}
     }));
   }
-  function useGeneration(){ return !!settings.apiKey && !settings.retrievalOnly; }
+  function useGeneration(){ return !!curKey() && !settings.retrievalOnly; }
 
   function renderMode(){
+    const P = PROVIDERS[settings.provider];
     if (useGeneration()) {
-      modeStatus.innerHTML = '<span class="dot ok"></span>Claude 整理回答';
-      modeBanner.innerHTML = '回答由 <b></b> 根據本機檢索到的原文段落整理；檢索在您的瀏覽器內完成，只有提問與檢索到的段落會送往 api.anthropic.com。';
-      modeBanner.querySelector('b').textContent = settings.model;
+      modeStatus.innerHTML = '<span class="dot ok"></span><span id="modeProv"></span> 整理回答';
+      modeStatus.querySelector('#modeProv').textContent = P.short;
+      modeBanner.innerHTML = '回答由 <b></b> 根據本機檢索到的原文段落整理；檢索在您的瀏覽器內完成，只有提問與檢索到的段落會送往 <span id="modeHost"></span>。';
+      modeBanner.querySelector('b').textContent = P.short + ' ' + curModel();
+      modeBanner.querySelector('#modeHost').textContent = P.host;
     } else {
       modeStatus.innerHTML = '<span class="dot mid"></span>僅列原文';
-      modeBanner.innerHTML = '目前為<b>「僅列原文」</b>模式：直接顯示檢索到的原文段落，不會連線到任何外部服務。若要由 Claude 整理成回答，請到「⚙ 設定」輸入 Claude API Key。';
+      modeBanner.innerHTML = '目前為<b>「僅列原文」</b>模式：直接顯示檢索到的原文段落，不會連線到任何外部服務。若要由模型整理成回答，請到「⚙ 設定」選擇服務並輸入金鑰（Gemini、Groq 有免費額度）。';
     }
   }
 
   const settingsOverlay = el('settingsOverlay');
+  const providerSelect = el('providerSelect');
   const keyInput = el('keyInput');
   const modelInput = el('modelInput');
+  const modelList = el('modelList');
+  const providerNote = el('providerNote');
+  const keyLabel = el('keyLabel');
   const rememberKey = el('rememberKey');
   const retrievalOnly = el('retrievalOnly');
   const settingsMsg = el('settingsMsg');
 
+  let draft = null;       // 設定視窗開啟期間的暫存（切換服務時不丟失已輸入的內容）
+  let draftProvider = 'gemini';
+
+  PROVIDER_ORDER.forEach(k => {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = PROVIDERS[k].label;
+    providerSelect.appendChild(o);
+  });
+
+  function stashDraft(){
+    draft.keys[draftProvider] = keyInput.value.trim();
+    draft.models[draftProvider] = modelInput.value.trim();
+  }
+  function loadDraft(p){
+    draftProvider = p;
+    const P = PROVIDERS[p];
+    keyInput.value = draft.keys[p] || '';
+    keyInput.placeholder = P.placeholder;
+    modelInput.value = draft.models[p] || P.defModel;
+    keyLabel.textContent = P.short + ' API Key（選填）';
+    modelList.textContent = '';
+    P.models.forEach(m => { const o = document.createElement('option'); o.value = m; modelList.appendChild(o); });
+    providerNote.textContent = '';
+    providerNote.appendChild(document.createTextNode(P.note + ' '));
+    const a = document.createElement('a');
+    a.href = P.keyUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = '前往申請／管理金鑰';
+    providerNote.appendChild(a);
+  }
+  providerSelect.addEventListener('change', () => { stashDraft(); loadDraft(providerSelect.value); });
+
   function openSettings(){
-    keyInput.value = settings.apiKey || '';
-    modelInput.value = settings.model || DEFAULT_MODEL;
+    draft = { keys: Object.assign({}, settings.keys), models: Object.assign({}, settings.models) };
+    providerSelect.value = settings.provider;
+    loadDraft(settings.provider);
     rememberKey.checked = settings.remember;
     retrievalOnly.checked = settings.retrievalOnly;
     settingsMsg.textContent = '';
@@ -743,14 +821,35 @@ mark{
     keyInput.type = showing ? 'password' : 'text';
     el('toggleKeyVisibility').textContent = showing ? '顯示' : '隱藏';
   });
+  function guessProviderOfKey(key){
+    for (const k of Object.keys(PROVIDERS)) if (PROVIDERS[k].prefix.test(key)) return k;
+    return null;
+  }
   el('saveSettings').addEventListener('click', ()=>{
-    const key = keyInput.value.trim();
-    if (key && /^hf_/i.test(key)) {
-      settingsMsg.textContent = '這是 Hugging Face 的 token，不是 Claude API Key（Claude 金鑰以 sk-ant- 開頭）。';
-      return;
+    stashDraft();
+    for (const k of Object.keys(PROVIDERS)) {
+      const key = draft.keys[k] || '';
+      if (!key) continue;
+      if (/^hf_/i.test(key)) {
+        settingsMsg.textContent = '這是 Hugging Face 的 token，不是 ' + PROVIDERS[k].short + ' 的金鑰。';
+        return;
+      }
+      const g = guessProviderOfKey(key);
+      if (g && g !== k) {
+        if (k === providerSelect.value) {
+          settingsMsg.textContent = '「' + PROVIDERS[k].short + '」欄位裡的金鑰看起來是 ' + PROVIDERS[g].short + ' 的（開頭 ' + key.slice(0, 4) + '…），請放到對應的服務下。';
+          return;
+        }
+        draft.keys[k] = '';      // 其他服務欄位裡放錯的金鑰：直接丟棄，避免擋住儲存
+      }
     }
-    settings.apiKey = key;
-    settings.model = modelInput.value.trim() || DEFAULT_MODEL;
+    settings.provider = providerSelect.value;
+    settings.keys = {};
+    settings.models = {};
+    for (const k of Object.keys(PROVIDERS)) {
+      if (draft.keys[k]) settings.keys[k] = draft.keys[k];
+      if (draft.models[k] && draft.models[k] !== PROVIDERS[k].defModel) settings.models[k] = draft.models[k];
+    }
     settings.remember = rememberKey.checked;
     settings.retrievalOnly = retrievalOnly.checked;
     persistSettings();
@@ -758,11 +857,12 @@ mark{
     closeSettings();
   });
   el('clearKeyBtn').addEventListener('click', ()=>{
-    settings.apiKey = '';
+    settings.keys = {};
+    if (draft) draft.keys = {};
     keyInput.value = '';
     persistSettings();
     renderMode();
-    settingsMsg.textContent = '';
+    settingsMsg.textContent = '已清除此瀏覽器上所有服務的金鑰。';
   });
   renderMode();
 
@@ -837,40 +937,69 @@ mark{
     return s;
   }
 
-  async function callClaude(system, userMsg){
+  async function callLLM(system, userMsg){
+    const P = PROVIDERS[settings.provider];
+    const model = curModel();
+    const key = curKey();
+    let url, headers, body;
+    if (settings.provider === 'claude') {
+      url = 'https://api.anthropic.com/v1/messages';
+      headers = {
+        'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      };
+      body = { model, max_tokens: 1500, system, messages: [{ role: 'user', content: userMsg }] };
+    } else if (settings.provider === 'gemini') {
+      url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model.replace(/^models\//, '')) + ':generateContent';
+      headers = { 'x-goog-api-key': key, 'content-type': 'application/json' };
+      body = {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: userMsg }] }],
+        generationConfig: { maxOutputTokens: 4096 }
+      };
+    } else {
+      url = 'https://api.groq.com/openai/v1/chat/completions';
+      headers = { 'authorization': 'Bearer ' + key, 'content-type': 'application/json' };
+      body = {
+        model, max_tokens: 1500,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }]
+      };
+    }
     let res;
     try {
-      res = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'x-api-key': settings.apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model: settings.model || DEFAULT_MODEL,
-          max_tokens: 1500,
-          system,
-          messages: [{ role: 'user', content: userMsg }]
-        })
-      });
+      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
     } catch (e) {
-      throw new Error('無法連線到 api.anthropic.com，請檢查網路連線或瀏覽器的擴充功能是否擋下請求。');
+      throw new Error('無法連線到 ' + P.host + '，請檢查網路連線或瀏覽器的擴充功能是否擋下請求。');
     }
     const raw = await res.text();
     let data = null;
     try { data = JSON.parse(raw); } catch(e){}
     if (!res.ok) {
-      const msg = data && data.error && data.error.message ? data.error.message : raw.slice(0, 200);
+      let msg = raw.slice(0, 200);
+      if (data && data.error && data.error.message) msg = data.error.message;
+      else if (data && data.detail) msg = String(data.detail);
       let hint = '';
-      if (res.status === 401) hint = '（API Key 無效或已被撤銷，請到「設定」重新輸入）';
+      if (res.status === 401 || res.status === 403 || /api key not valid|invalid api key|API_KEY_INVALID/i.test(msg)) hint = '（金鑰無效、已被撤銷或沒有權限，請到「設定」重新輸入）';
       else if (res.status === 404) hint = '（找不到這個模型 ID，請到「設定」更換模型）';
-      else if (res.status === 429) hint = '（請求過於頻繁或超出用量上限，請稍後再試）';
+      else if (res.status === 429) hint = '（請求太頻繁或已用完額度；免費額度有每分鐘／每日上限，請稍後再試）';
       else if (res.status === 400 && /credit balance/i.test(msg)) hint = '（Anthropic 帳戶餘額不足，請至 console.anthropic.com 儲值）';
-      throw new Error('HTTP ' + res.status + '：' + msg + hint);
+      throw new Error(P.short + ' HTTP ' + res.status + '：' + msg + hint);
     }
-    const text = (data && data.content ? data.content : []).filter(b => b.type === 'text').map(b => b.text).join('');
+    let text = '';
+    if (settings.provider === 'claude') {
+      text = (data && data.content ? data.content : []).filter(b => b.type === 'text').map(b => b.text).join('');
+    } else if (settings.provider === 'gemini') {
+      const cand = data && data.candidates && data.candidates[0];
+      text = cand && cand.content && cand.content.parts ? cand.content.parts.map(p => p.text || '').join('') : '';
+      if (!text && data && data.promptFeedback && data.promptFeedback.blockReason) {
+        throw new Error('Gemini 拒絕回答（' + data.promptFeedback.blockReason + '）。');
+      }
+      if (cand && cand.finishReason === 'MAX_TOKENS') text += '\n（回答因長度上限被截斷）';
+    } else {
+      const ch = data && data.choices && data.choices[0];
+      text = ch && ch.message && ch.message.content ? ch.message.content : '';
+      text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    }
     return text || '(無回應內容)';
   }
 
@@ -913,7 +1042,7 @@ mark{
   async function askQuestion(question){
     addUserMessage(question);
     const generating = useGeneration();
-    const { wrap, bubble } = addAssistantPending(generating ? '正在檢索並請 Claude 整理回答…' : '正在檢索…');
+    const { wrap, bubble } = addAssistantPending(generating ? '正在檢索並請模型整理回答…' : '正在檢索…');
     const { hits, qSet, missingVols } = retrieve(question, TOP_K);
     const missNote = missingVols && missingVols.length ? '※ 語料庫尚未收錄 ' + missingVols.join('、') + '，以下為其他卷中用字相近的段落。\n' : '';
     if (!hits.length) {
@@ -923,7 +1052,7 @@ mark{
     }
     if (!generating) { renderRetrievalOnly(bubble, wrap, hits, qSet, missNote); return; }
     try {
-      const answer = await callClaude(buildSystemPrompt(), buildUserMessage(question, hits));
+      const answer = await callLLM(buildSystemPrompt(), buildUserMessage(question, hits));
       bubble.className = 'bubble';
       bubble.textContent = missNote + answer;
       const details = document.createElement('details');
@@ -935,7 +1064,7 @@ mark{
       wrap.appendChild(details);
     } catch (err) {
       bubble.className = 'bubble error';
-      bubble.textContent = '呼叫 Claude 失敗：' + err.message + '\n（下方仍列出本機檢索到的原文段落。）';
+      bubble.textContent = '呼叫 ' + PROVIDERS[settings.provider].short + ' 失敗：' + err.message + '\n（下方仍列出本機檢索到的原文段落。）';
       wrap.appendChild(buildPassages(hits, qSet, 3));
     }
   }
