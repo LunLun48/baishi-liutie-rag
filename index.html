@@ -585,7 +585,7 @@ mark{
     return function retrieve(question, k){
       let qTokens = Array.from(new Set(bigramsOf(cleanQuery(question))));
       const soloRuns = runsOf(cleanQuery(question)).filter(r => Array.from(r).length === 1);
-      if (!qTokens.length && !soloRuns.length) qTokens = Array.from(new Set(bigramsOf(question)));
+      if (!qTokens.length && !soloRuns.length && !/總目|目錄|門類|門目|有哪些門|全書/.test(question)) qTokens = Array.from(new Set(bigramsOf(question)));
       const qSet = new Set(qTokens);
       const qNorm = normStr(String(question || '')).replace(PUNCT_RE, '');
 
