@@ -710,6 +710,15 @@ mark{
       keyUrl: 'https://chatanywhere.tech/', prefix: null,
       note: '免費，用 GitHub 帳號領金鑰；限個人非商業使用，每天約 200 次。第三方轉發服務，提問內容會經過它的伺服器。'
     },
+    cohere: {
+      label: 'Cohere（免費試用金鑰）', short: 'Cohere', host: 'api.cohere.ai', api: 'openai', maxTokens: 3000,
+      url: 'https://api.cohere.ai/compatibility/v1/chat/completions', modelsUrl: 'https://api.cohere.ai/compatibility/v1/models',
+      placeholder: '（Cohere 金鑰）', defModel: 'command-a-03-2025',
+      models: ['command-a-03-2025', 'command-a-plus-05-2026', 'command-r-plus-08-2024', 'command-r7b-12-2024'],
+      keyUrl: 'https://dashboard.cohere.com/api-keys', prefix: null,
+      altSystemRole: 'developer',
+      note: '免費試用金鑰，不需信用卡；限非商業使用，每分鐘 20 次、每月 1,000 次。'
+    },
     deepseek: {
       label: 'DeepSeek（付費，便宜）', short: 'DeepSeek', host: 'api.deepseek.com', api: 'openai', maxTokens: 3000,
       url: 'https://api.deepseek.com/chat/completions', modelsUrl: 'https://api.deepseek.com/models',
@@ -750,7 +759,7 @@ mark{
       note: '付費，依 API 用量計費。'
     }
   };
-  const PROVIDER_ORDER = ['gemini', 'chatanywhere', 'deepseek', 'groq', 'openrouter', 'mistral', 'claude'];
+  const PROVIDER_ORDER = ['gemini', 'chatanywhere', 'cohere', 'deepseek', 'groq', 'openrouter', 'mistral', 'claude'];
   const fetchedModels = {};   // 本次開啟頁面期間，各服務「載入可用模型」的結果
 
   let settings = {
@@ -879,7 +888,8 @@ mark{
       if (!ids.includes('openrouter/free')) ids.unshift('openrouter/free');
       return ids;
     } else {
-      ids = (data.data || []).map(m => m.id);
+      ids = (data.data || data.models || []).map(m => m.id || m.name).filter(Boolean);
+      if (provider === 'cohere') ids = ids.filter(id => /^(command|aya)/i.test(id) && !/vision|translate|embed|rerank|transcribe/i.test(id));
       if (provider === 'groq') ids = ids.filter(id => !/whisper|tts|guard|embed|playai|orpheus/i.test(id));
       if (provider === 'mistral') ids = ids.filter(id => !/embed|moderation|ocr/i.test(id));
     }
@@ -1090,15 +1100,25 @@ mark{
       if (P.useMaxCompletion && /^(gpt-5|o\d)/i.test(model)) body.max_completion_tokens = 4000;   // 推理型模型不收 max_tokens
       else body.max_tokens = P.maxTokens || 1500;
     }
-    let res;
-    try {
-      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-    } catch (e) {
-      throw new Error('無法連線到 ' + P.host + '，請檢查網路連線或瀏覽器的擴充功能是否擋下請求。');
-    }
-    const raw = await res.text();
+    const send = async () => {
+      try {
+        return await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      } catch (e) {
+        throw new Error('無法連線到 ' + P.host + '，請檢查網路連線或瀏覽器的擴充功能是否擋下請求。');
+      }
+    };
+    let res = await send();
+    let raw = await res.text();
     let data = null;
     try { data = JSON.parse(raw); } catch(e){}
+    // 少數相容服務（如 Cohere）要求系統指示用 developer 角色；被拒時改用一次
+    if (!res.ok && res.status === 400 && P.altSystemRole && body.messages && body.messages[0] && body.messages[0].role === 'system' && /role|system|developer/i.test(raw)) {
+      body.messages[0].role = P.altSystemRole;
+      res = await send();
+      raw = await res.text();
+      data = null;
+      try { data = JSON.parse(raw); } catch(e){}
+    }
     if (!res.ok) {
       let msg = raw.slice(0, 200);
       if (data && data.error && data.error.message) msg = data.error.message;
