@@ -702,6 +702,14 @@ mark{
       keyUrl: 'https://aistudio.google.com/apikey', prefix: /^AIza/,
       note: '免費，不需信用卡。免費額度下，內容可能被 Google 用於改進產品。'
     },
+    chatanywhere: {
+      label: 'ChatAnywhere（免費 GPT）', short: 'ChatAnywhere', host: 'api.chatanywhere.org', api: 'openai', maxTokens: 3000, useMaxCompletion: true,
+      url: 'https://api.chatanywhere.org/v1/chat/completions', modelsUrl: 'https://api.chatanywhere.org/v1/models',
+      placeholder: 'sk-…', defModel: 'gpt-4.1-mini',
+      models: ['gpt-4.1-mini', 'gpt-4o-mini', 'gpt-4.1-nano', 'deepseek-v3.2'],
+      keyUrl: 'https://chatanywhere.tech/', prefix: null,
+      note: '免費，用 GitHub 帳號領金鑰；限個人非商業使用，每天約 200 次。第三方轉發服務，提問內容會經過它的伺服器。'
+    },
     deepseek: {
       label: 'DeepSeek（付費，便宜）', short: 'DeepSeek', host: 'api.deepseek.com', api: 'openai', maxTokens: 3000,
       url: 'https://api.deepseek.com/chat/completions', modelsUrl: 'https://api.deepseek.com/models',
@@ -742,7 +750,7 @@ mark{
       note: '付費，依 API 用量計費。'
     }
   };
-  const PROVIDER_ORDER = ['gemini', 'deepseek', 'groq', 'openrouter', 'mistral', 'claude'];
+  const PROVIDER_ORDER = ['gemini', 'chatanywhere', 'deepseek', 'groq', 'openrouter', 'mistral', 'claude'];
   const fetchedModels = {};   // 本次開啟頁面期間，各服務「載入可用模型」的結果
 
   let settings = {
@@ -787,9 +795,13 @@ mark{
 
   function renderMode(){
     const P = PROVIDERS[settings.provider];
-    modeBanner.textContent = useGeneration()
-      ? '由 ' + P.short + '（' + curModel() + '）整理回答'
-      : '目前只列出原文。要讓模型整理回答，請到「⚙ 設定」填入金鑰。';
+    if (useGeneration()) {
+      modeBanner.textContent = '';
+      modeBanner.style.display = 'none';       // 已設定金鑰時不顯示「由某模型整理回答」
+    } else {
+      modeBanner.style.display = '';
+      modeBanner.textContent = '目前只列出原文。要讓模型整理回答，請到「⚙ 設定」填入金鑰。';
+    }
   }
 
   const settingsOverlay = el('settingsOverlay');
@@ -1072,9 +1084,11 @@ mark{
       url = P.url;
       headers = { 'authorization': 'Bearer ' + key, 'content-type': 'application/json' };
       body = {
-        model, max_tokens: P.maxTokens || 1500,
+        model,
         messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }]
       };
+      if (P.useMaxCompletion && /^(gpt-5|o\d)/i.test(model)) body.max_completion_tokens = 4000;   // 推理型模型不收 max_tokens
+      else body.max_tokens = P.maxTokens || 1500;
     }
     let res;
     try {
